@@ -62,7 +62,7 @@ function localFail(script) {
 
 function embedScripts(onSuccess, onFail) {
   const scriptsToEmbed = [];
-  scriptsToEmbed.push('https://pixel.switchgrowth.com/pixel.js?id='+ encodeUriComponent(pixelId));
+  scriptsToEmbed.push('https://api.s10h.io/pixel.js?id='+ encodeUriComponent(pixelId));
   log("Scripts to embed:", scriptsToEmbed);
   
   while(scriptsToEmbed.length) {
