@@ -15,5 +15,5 @@
 homepage: "https://www.switchgrowth.com"
 documentation: "https://docs.switchgrowth.com/boost"
 versions:
-  - sha: dd06937678cb48056804f18ea15fdea66ce7322d
+  - sha: 905cffbffd20577dfaf30d313d25efcba403cde7
     changeNotes: Initial Version
