@@ -123,7 +123,7 @@ ___WEB_PERMISSIONS___
             "listItem": [
               {
                 "type": 1,
-                "string": "https://*.switchgrowth.com/*"
+                "string": "https://*.s10h.io/*"
               }
             ]
           }
