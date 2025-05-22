@@ -1,4 +1,4 @@
-___TERMS_OF_SERVICE___
+﻿___TERMS_OF_SERVICE___
 
 By creating or modifying this file you agree to Google Tag Manager's Community
 Template Gallery Developer Terms of Service available at
@@ -40,6 +40,33 @@ ___TEMPLATE_PARAMETERS___
         "type": "NON_EMPTY"
       }
     ]
+  },
+  {
+    "type": "TEXT",
+    "name": "excludedIds",
+    "displayName": "CSS Element IDs to exclude",
+    "simpleValueType": true,
+    "textAsList": true,
+    "help": "Enter IDs (one per line) that Boost should ignore",
+    "lineCount": 10
+  },
+  {
+    "type": "TEXT",
+    "name": "excludedAttributes",
+    "displayName": "Attributes to exclude",
+    "simpleValueType": true,
+    "textAsList": true,
+    "help": "Specific attrubytes (like gclid, ipaddress, etc) that Boost should not collect",
+    "lineCount": 10
+  },
+  {
+    "type": "TEXT",
+    "name": "excludedInputTypes",
+    "displayName": "Input Types to Exclude",
+    "simpleValueType": true,
+    "textAsList": true,
+    "help": "Input types Boost should ignore. By default, Boost ignores password, hidden and file input types.",
+    "lineCount": 5
   }
 ]
 
@@ -50,7 +77,12 @@ const injectScript = require('injectScript');
 const encodeUriComponent = require('encodeUriComponent');
 const log = require('logToConsole');
 const pixelId = data.pixelCode;
+const excludedIds = data.excludedIds;
+const excludedInputTypes = data.excludedInputTypes;
+const excludedAttributes = data.excludedAttributes;
 const cacheKey = "switch-" + pixelId;
+
+log("excluded IDs:", excludedIds);
 
 function localSuccess(script) {
   log("Loaded:", script);
@@ -62,7 +94,22 @@ function localFail(script) {
 
 function embedScripts(onSuccess, onFail) {
   const scriptsToEmbed = [];
-  scriptsToEmbed.push('https://api.s10h.io/pixel.js?id='+ encodeUriComponent(pixelId));
+  let options = "";
+  
+  if (excludedIds.length > 0) {
+    options += "&skipped-input-ids=" + excludedIds.toString();
+  }
+  
+  if (excludedAttributes.length > 0) {
+    options += "&excluded-attributes=" + excludedAttributes.toString();
+  }
+  
+  if (excludedInputTypes.length > 0 ) {
+    options += "&skipped-input-types=" + excludedInputTypes.toString();
+  }
+  
+  log("options:", options);
+  scriptsToEmbed.push('https://api.s10h.io/pixel.js?id='+ encodeUriComponent(pixelId + options));
   log("Scripts to embed:", scriptsToEmbed);
   
   while(scriptsToEmbed.length) {
