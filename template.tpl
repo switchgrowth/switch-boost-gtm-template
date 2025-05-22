@@ -82,8 +82,6 @@ const excludedInputTypes = data.excludedInputTypes;
 const excludedAttributes = data.excludedAttributes;
 const cacheKey = "switch-" + pixelId;
 
-log("excluded IDs:", excludedIds);
-
 function localSuccess(script) {
   log("Loaded:", script);
 }
@@ -108,7 +106,6 @@ function embedScripts(onSuccess, onFail) {
     options += "&skipped-input-types=" + excludedInputTypes.toString();
   }
   
-  log("options:", options);
   scriptsToEmbed.push('https://api.s10h.io/pixel.js?id='+ encodeUriComponent(pixelId + options));
   log("Scripts to embed:", scriptsToEmbed);
   
