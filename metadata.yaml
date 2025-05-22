@@ -15,5 +15,7 @@
 homepage: "https://www.switchgrowth.com"
 documentation: "https://docs.switchgrowth.com/boost"
 versions:
+  - sha: 1542c5e72dee8c405b1d0928ffa48ed9656d64ce
+    changeNotes: Add support for additional exclusion options
   - sha: 3d7b6f096243143e5fc55515926783e2afa65e5d
     changeNotes: Initial Version
