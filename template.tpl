@@ -1,4 +1,4 @@
-___TERMS_OF_SERVICE___
+﻿___TERMS_OF_SERVICE___
 
 By creating or modifying this file you agree to Google Tag Manager's Community
 Template Gallery Developer Terms of Service available at
@@ -40,6 +40,14 @@ ___TEMPLATE_PARAMETERS___
         "type": "NON_EMPTY"
       }
     ]
+  },
+  {
+    "type": "TEXT",
+    "name": "pixelUrl",
+    "displayName": "First Party Pixel Domain",
+    "simpleValueType": true,
+    "valueHint": "pixel.clientwebsite.com (no https or slashes needed)",
+    "help": "This value should only be set if Switch has setup the Boost pixel to fire from within the clients infrastructure via DNS records. \u003cstrong\u003eDefaults to api.s10h.io\u003c/strong\u003e"
   }
 ]
 
@@ -50,7 +58,9 @@ const injectScript = require('injectScript');
 const encodeUriComponent = require('encodeUriComponent');
 const log = require('logToConsole');
 const pixelId = data.pixelCode;
+const pixelUrl = data.pixelUrl;
 const cacheKey = "switch-" + pixelId;
+
 
 function localSuccess(script) {
   log("Loaded:", script);
@@ -62,8 +72,8 @@ function localFail(script) {
 
 function embedScripts(onSuccess, onFail) {
   const scriptsToEmbed = [];
-  scriptsToEmbed.push('https://api.s10h.io/pixel.js?id='+ encodeUriComponent(pixelId));
-  log("Scripts to embed:", scriptsToEmbed);
+  const urlForPixel = pixelUrl ? pixelUrl : 'api.s10h.io';
+  scriptsToEmbed.push('https://' + pixelUrl + '/pixel.js?id='+ encodeUriComponent(pixelId));
   
   while(scriptsToEmbed.length) {
     let script = scriptsToEmbed.pop();
@@ -132,6 +142,10 @@ ___WEB_PERMISSIONS___
               {
                 "type": 1,
                 "string": "https://*.s10h.io/*"
+              },
+              {
+                "type": 1,
+                "string": "https://switch-rails.127.0.0.1.nip.io/*"
               }
             ]
           }
