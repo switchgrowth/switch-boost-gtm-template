@@ -16,12 +16,11 @@ homepage: "https://www.switchgrowth.com"
 documentation: "https://docs.switchgrowth.com/boost"
 versions:
   # Latest version
-  - sha: 400fd06f5e76b5388adff0259eb54aa413c88472
+  - sha: 19f181947f4d1f653d304ea44d55c0fe2d147761
     changeNotes: Add support for additional exclusion options
   # Older versions
   - sha: f65f8d278a0d7e117753f644244e7ca720868869
     changeNotes: Add pixelUrl to the metadata to allow for overriding default pixel domain
-
   - sha: 3d7b6f096243143e5fc55515926783e2afa65e5d
     changeNotes: Initial Version
 
