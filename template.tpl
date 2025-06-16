@@ -46,8 +46,35 @@ ___TEMPLATE_PARAMETERS___
     "name": "pixelUrl",
     "displayName": "First Party Pixel Domain",
     "simpleValueType": true,
-    "valueHint": "pixel.clientwebsite.com (no https or slashes needed)",
-    "help": "This value should only be set if Switch has setup the Boost pixel to fire from within the clients infrastructure via DNS records. \u003cstrong\u003eDefaults to api.s10h.io\u003c/strong\u003e"
+    "help": "This value should only be set if Switch has setup the Boost pixel to fire from within the clients infrastructure via DNS records. \u003cstrong\u003eDefaults to api.s10h.io\u003c/strong\u003e",
+    "valueHint": "pixel.clientwebsite.com (no https or slashes needed)"
+  },
+  {
+    "type": "TEXT",
+    "name": "excludedIds",
+    "displayName": "CSS Element IDs to exclude",
+    "simpleValueType": true,
+    "textAsList": true,
+    "help": "Enter IDs (one per line) that Boost should ignore",
+    "lineCount": 10
+  },
+  {
+    "type": "TEXT",
+    "name": "excludedAttributes",
+    "displayName": "Attributes to exclude",
+    "simpleValueType": true,
+    "textAsList": true,
+    "help": "Specific attrubytes (like gclid, ipaddress, etc) that Boost should not collect",
+    "lineCount": 10
+  },
+  {
+    "type": "TEXT",
+    "name": "excludedInputTypes",
+    "displayName": "Input Types to Exclude",
+    "simpleValueType": true,
+    "textAsList": true,
+    "help": "Input types Boost should ignore. By default, Boost ignores password, hidden and file input types.",
+    "lineCount": 5
   }
 ]
 
@@ -57,10 +84,14 @@ ___SANDBOXED_JS_FOR_WEB_TEMPLATE___
 const injectScript = require('injectScript');
 const encodeUriComponent = require('encodeUriComponent');
 const log = require('logToConsole');
+const gtagSet = require('gtagSet');
+
 const pixelId = data.pixelCode;
 const pixelUrl = data.pixelUrl;
+const excludedIds = data.excludedIds;
+const excludedInputTypes = data.excludedInputTypes;
+const excludedAttributes = data.excludedAttributes;
 const cacheKey = "switch-" + pixelId;
-
 
 function localSuccess(script) {
   log("Loaded:", script);
@@ -72,9 +103,24 @@ function localFail(script) {
 
 function embedScripts(onSuccess, onFail) {
   const scriptsToEmbed = [];
+  let options = "";
+
+  if (excludedIds.length > 0) {
+    options += "&skipped-input-ids=" + excludedIds.toString();
+  }
+
+  if (excludedAttributes.length > 0) {
+    options += "&excluded-attributes=" + excludedAttributes.toString();
+  }
+
+  if (excludedInputTypes.length > 0 ) {
+    options += "&skipped-input-types=" + excludedInputTypes.toString();
+  }
+
   const urlForPixel = pixelUrl ? pixelUrl : 'api.s10h.io';
-  scriptsToEmbed.push('https://' + pixelUrl + '/pixel.js?id='+ encodeUriComponent(pixelId));
-  
+  scriptsToEmbed.push('https://' + pixelUrl + '/pixel.js?id='+ encodeUriComponent(pixelId + options));
+  log("Scripts to embed:", scriptsToEmbed);
+
   while(scriptsToEmbed.length) {
     let script = scriptsToEmbed.pop();
     injectScript(script,
@@ -83,7 +129,7 @@ function embedScripts(onSuccess, onFail) {
                  cacheKey
                 );
   }
-  
+
   if (scriptsToEmbed.length === 0) {
     onSuccess();
   } else {
@@ -94,10 +140,12 @@ function embedScripts(onSuccess, onFail) {
 embedScripts(
   () => {
     log("Switch Boost embedded");
+    gtagSet({'sg_pixel_loaded': true});
     data.gtmOnSuccess();
   },
   () => {
     log("Switch Boost unable to initialize");
+    gtagSet({'sg_pixel_loaded': false});
     data.gtmOnFailure();
   }
 );
@@ -142,10 +190,6 @@ ___WEB_PERMISSIONS___
               {
                 "type": 1,
                 "string": "https://*.s10h.io/*"
-              },
-              {
-                "type": 1,
-                "string": "https://switch-rails.127.0.0.1.nip.io/*"
               }
             ]
           }
@@ -154,6 +198,16 @@ ___WEB_PERMISSIONS___
     },
     "clientAnnotations": {
       "isEditedByUser": true
+    },
+    "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "write_data_layer",
+        "versionId": "1"
+      },
+      "param": []
     },
     "isRequired": true
   }
