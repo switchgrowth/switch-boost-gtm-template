@@ -118,7 +118,7 @@ function embedScripts(onSuccess, onFail) {
   }
 
   const urlForPixel = pixelUrl ? pixelUrl : 'api.s10h.io';
-  scriptsToEmbed.push('https://' + pixelUrl + '/pixel.js?id='+ encodeUriComponent(pixelId + options));
+  scriptsToEmbed.push('https://' + urlForPixel + '/pixel.js?id='+ encodeUriComponent(pixelId + options));
   log("Scripts to embed:", scriptsToEmbed);
 
   while(scriptsToEmbed.length) {
