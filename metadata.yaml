@@ -16,9 +16,11 @@ homepage: "https://www.switchgrowth.com"
 documentation: "https://docs.switchgrowth.com/boost"
 versions:
   # Latest version
+  - sha: 0bf97d9457010243071d7c8f823dd730c249c2bf
+    changeNotes: Removing GtagSet API Call.
+  # Older versions (not used)
   - sha: ad05d29fcd4649cf3760d6e08b67310c258da107
     changeNotes: Minor codefix for exclusion options
-# Older versions (not used)
   - sha: 5d8d343346596b9fc7e3f3269b0a044f8aac0be6
     changeNotes: Datalayer Permission Fix
   - sha: cab0159f229464c2191471ca05935c0d406fa399
