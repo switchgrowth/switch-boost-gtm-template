@@ -10,7 +10,7 @@ ___INFO___
 
 {
   "type": "TAG",
-  "id": "cvt_temp_public_id",
+  "id": "cvt_5NGWV",
   "version": 1,
   "securityGroups": [],
   "displayName": "Switch Boost",
@@ -103,7 +103,7 @@ function localFail(script) {
 function embedScripts(onSuccess, onFail) {
   const scriptsToEmbed = [];
   let options = "";
-  
+
   if (excludedIds.length > 0) {
     options += "&skipped-input-ids=" + excludedIds.toString();
   }
