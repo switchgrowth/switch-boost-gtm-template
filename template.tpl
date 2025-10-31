@@ -59,6 +59,15 @@ ___TEMPLATE_PARAMETERS___
   },
   {
     "type": "TEXT",
+    "name": "sessionLimit",
+    "displayName": "Session Size Limit",
+    "simpleValueType": true,
+    "defaultValue": 1500,
+    "help": "The maximum bytes that a session size can be.",
+    "valueUnit": "bytes"
+  },
+  {
+    "type": "TEXT",
     "name": "excludedIds",
     "displayName": "CSS Element IDs to exclude",
     "simpleValueType": true,
@@ -72,7 +81,7 @@ ___TEMPLATE_PARAMETERS___
     "displayName": "Attributes to exclude",
     "simpleValueType": true,
     "textAsList": true,
-    "help": "Specific attributes (like gclid, ipaddress, etc) that Boost should not collect",
+    "help": "Specific attrubytes (like gclid, ipaddress, etc) that Boost should not collect",
     "lineCount": 10
   },
   {
@@ -92,10 +101,12 @@ ___SANDBOXED_JS_FOR_WEB_TEMPLATE___
 const injectScript = require('injectScript');
 const encodeUriComponent = require('encodeUriComponent');
 const log = require('logToConsole');
+const makeInteger = require('makeInteger');
 
 const pixelId = data.pixelCode;
 const pixelUrl = data.pixelUrl;
 const automaticMode = data.automaticMode;
+const sessionLimit = data.sessionLimit;
 const excludedIds = data.excludedIds || "";
 const excludedInputTypes = data.excludedInputTypes || "";
 const excludedAttributes = data.excludedAttributes || "";
@@ -128,6 +139,9 @@ function embedScripts(onSuccess, onFail) {
   let autoQuery = automaticMode ? "&auto=true" : "&auto=false";
   
   options += autoQuery;
+  
+  // Script handles flooring the value to 500 minimum
+  options += "&session-byte-limit=" + sessionLimit;
 
   const urlForPixel = pixelUrl ? pixelUrl : 'api.s10h.io';
   scriptsToEmbed.push('https://' + urlForPixel + '/pixel.js?id='+ encodeUriComponent(pixelId + options));
