@@ -17,6 +17,8 @@ documentation: "https://docs.switchgrowth.com/boost"
 versions:
   # Latest version first, other notes are not used and
   # are for reference only.
+  - sha: 18519e2cce6d39f215bed7ab2586f37d859bbd87
+    changeNotes: Add support for configurable session size limit
   - sha: b1a08bd62e67194f32b462422ff3636a8a57711a
     changeNotes: Add support for automatic mode configuration
   - sha: 678f36ebe058aa454b57eb7f4005dd437089de91
