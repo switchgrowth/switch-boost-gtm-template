@@ -10,7 +10,7 @@ ___INFO___
 
 {
   "type": "TAG",
-  "id": "cvt_5NGWV",
+  "id": "cvt_temp_public_id",
   "version": 1,
   "securityGroups": [],
   "displayName": "Switch Boost",
@@ -50,6 +50,14 @@ ___TEMPLATE_PARAMETERS___
     "valueHint": "pixel.clientwebsite.com (no https or slashes needed)"
   },
   {
+    "type": "CHECKBOX",
+    "name": "automaticMode",
+    "checkboxText": "Automatic Mode",
+    "simpleValueType": true,
+    "help": "Automatic mode will monitor the page and capture advertising identifiers automatically for submission.",
+    "defaultValue": true
+  },
+  {
     "type": "TEXT",
     "name": "excludedIds",
     "displayName": "CSS Element IDs to exclude",
@@ -64,7 +72,7 @@ ___TEMPLATE_PARAMETERS___
     "displayName": "Attributes to exclude",
     "simpleValueType": true,
     "textAsList": true,
-    "help": "Specific attrubytes (like gclid, ipaddress, etc) that Boost should not collect",
+    "help": "Specific attributes (like gclid, ipaddress, etc) that Boost should not collect",
     "lineCount": 10
   },
   {
@@ -87,6 +95,7 @@ const log = require('logToConsole');
 
 const pixelId = data.pixelCode;
 const pixelUrl = data.pixelUrl;
+const automaticMode = data.automaticMode;
 const excludedIds = data.excludedIds || "";
 const excludedInputTypes = data.excludedInputTypes || "";
 const excludedAttributes = data.excludedAttributes || "";
@@ -103,7 +112,7 @@ function localFail(script) {
 function embedScripts(onSuccess, onFail) {
   const scriptsToEmbed = [];
   let options = "";
-
+  
   if (excludedIds.length > 0) {
     options += "&skipped-input-ids=" + excludedIds.toString();
   }
@@ -115,6 +124,10 @@ function embedScripts(onSuccess, onFail) {
   if (excludedInputTypes.length > 0 ) {
     options += "&skipped-input-types=" + excludedInputTypes.toString();
   }
+  
+  let autoQuery = automaticMode ? "&auto=true" : "&auto=false";
+  
+  options += autoQuery;
 
   const urlForPixel = pixelUrl ? pixelUrl : 'api.s10h.io';
   scriptsToEmbed.push('https://' + urlForPixel + '/pixel.js?id='+ encodeUriComponent(pixelId + options));
