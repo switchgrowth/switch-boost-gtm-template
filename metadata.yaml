@@ -15,10 +15,12 @@
 homepage: "https://www.switchgrowth.com"
 documentation: "https://docs.switchgrowth.com/boost"
 versions:
-  # Latest version
+  # Latest version first, other notes are not used and
+  # are for reference only.
+  - sha: b1a08bd62e67194f32b462422ff3636a8a57711a
+    changeNotes: Add support for automatic mode configuration
   - sha: 678f36ebe058aa454b57eb7f4005dd437089de91
     changeNotes: Fix template ID.
-  # Older versions (not used)
   - sha: 0bf97d9457010243071d7c8f823dd730c249c2bf
     changeNotes: Removing GtagSet API Call.
   - sha: ad05d29fcd4649cf3760d6e08b67310c258da107
