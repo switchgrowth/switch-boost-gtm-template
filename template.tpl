@@ -144,7 +144,7 @@ function embedScripts(onSuccess, onFail) {
   options += "&session-byte-limit=" + sessionLimit;
 
   const urlForPixel = pixelUrl ? pixelUrl : 'api.s10h.io';
-  scriptsToEmbed.push('https://' + urlForPixel + '/pixel.js?id='+ encodeUriComponent(pixelId + options));
+  scriptsToEmbed.push('https://' + urlForPixel + '/pixel.js?id=' + encodeUriComponent(pixelId) + options);
   log("Scripts to embed:", scriptsToEmbed);
 
   while(scriptsToEmbed.length) {
