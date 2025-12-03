@@ -17,6 +17,8 @@ documentation: "https://docs.switchgrowth.com/boost"
 versions:
   # Latest version first, other notes are not used and
   # are for reference only.
+  - sha: dce2261fb41e4545e4cf530dbcff2f13ffac6e19
+    changeNotes: Update default session size limit to 4000 bytes
   - sha: 67a879a0bd0b79ae0ce7bc5f6bc8698ad7c9ae7c
     changeNotes: Fix options encoding causing issues with account ID
   - sha: 18519e2cce6d39f215bed7ab2586f37d859bbd87
