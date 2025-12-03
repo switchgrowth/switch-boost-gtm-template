@@ -62,7 +62,7 @@ ___TEMPLATE_PARAMETERS___
     "name": "sessionLimit",
     "displayName": "Session Size Limit",
     "simpleValueType": true,
-    "defaultValue": 1500,
+    "defaultValue": 4000,
     "help": "The maximum bytes that a session size can be.",
     "valueUnit": "bytes"
   },
