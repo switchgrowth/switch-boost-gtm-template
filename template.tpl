@@ -111,7 +111,6 @@ function installSwitchStub() {
   const stub = { __queue: queue };
   const methods = [
     "sendEvent",
-    "sendSignal",
     "sendTemplateEvent",
     "sendManualCapture",
     "setSecureCookieValues",
@@ -324,19 +323,16 @@ scenarios:
     // Capture whatever the template installs on window.Switch.
     let installedSwitch = null;
 
-    // Simulate "no existing window.Switch on the page" so the install path runs.
     mock('copyFromWindow', (key) => {
       if (key === 'Switch') return installedSwitch;
       return undefined;
     });
 
-    // Capture the stub the template installs.
     mock('setInWindow', (key, value) => {
       if (key === 'Switch') installedSwitch = value;
       return true;
     });
 
-    // Don't actually try to download pixel.js during the test.
     mock('injectScript', (url, onSuccess) => {
       onSuccess();
     });
@@ -351,10 +347,9 @@ scenarios:
     assertThat(installedSwitch).isDefined();
     assertThat(installedSwitch.__queue).isEqualTo([]);
 
-    // All 11 queueable methods are functions on the stub.
+    // All 10 queueable methods are functions on the stub.
     const expectedMethods = [
       'sendEvent',
-      'sendSignal',
       'sendTemplateEvent',
       'sendManualCapture',
       'setSecureCookieValues',
@@ -370,22 +365,22 @@ scenarios:
     });
 
     // Calling a stub method pushes a [methodName, args] tuple onto __queue.
-    installedSwitch.sendSignal('pipeline-A', { customer: { email: 'x' } });
+    installedSwitch.sendEvent('api-key', 'pipeline-A', { customer: { email: 'x' } });
     installedSwitch.sendTemplateEvent({ apiKey: 'k', pipelineId: 'p' });
     installedSwitch.transactionId();
 
     assertThat(installedSwitch.__queue.length).isEqualTo(3);
-    assertThat(installedSwitch.__queue[0][0]).isEqualTo('sendSignal');
-    assertThat(installedSwitch.__queue[0][1][0]).isEqualTo('pipeline-A');
+    assertThat(installedSwitch.__queue[0][0]).isEqualTo('sendEvent');
+    assertThat(installedSwitch.__queue[0][1][0]).isEqualTo('api-key');
     assertThat(installedSwitch.__queue[1][0]).isEqualTo('sendTemplateEvent');
     assertThat(installedSwitch.__queue[2][0]).isEqualTo('transactionId');
 
-    // Tag still finishes successfully (gtmOnSuccess called via embedScripts onSuccess).
+    // Tag still finishes successfully.
     assertApi('gtmOnSuccess').wasCalled();
 - name: Queue Event Idempotency Test
   code: |
-    // First run — empty initial state.
     let installedSwitch = null;
+
     mock('copyFromWindow', (key) => key === 'Switch' ? installedSwitch : undefined);
     mock('setInWindow', (key, value) => {
       if (key === 'Switch') installedSwitch = value;
@@ -393,20 +388,22 @@ scenarios:
     });
     mock('injectScript', (url, onSuccess) => onSuccess());
 
+    // First Boost run installs the stub.
     runCode({ pixelCode: "test_pixel_id" });
 
-    // Add something to the queue from a "Realtime Event tag fire" between Boost runs.
-    installedSwitch.sendSignal('pipeline-A', { foo: 'bar' });
+    // Realtime Event tag fires between Boost runs and queues a call.
+    installedSwitch.sendEvent('api-key', 'pipeline-A', { foo: 'bar' });
+
     const queueBefore = installedSwitch.__queue;
     const stubBefore = installedSwitch;
     assertThat(queueBefore.length).isEqualTo(1);
 
-    // Second Boost run — should NOT replace the stub or wipe the queue.
+    // Second Boost run must NOT replace the stub or wipe the queue.
     runCode({ pixelCode: "test_pixel_id" });
 
     assertThat(installedSwitch).isEqualTo(stubBefore);
     assertThat(installedSwitch.__queue.length).isEqualTo(1);
-    assertThat(installedSwitch.__queue[0][0]).isEqualTo('sendSignal');
+    assertThat(installedSwitch.__queue[0][0]).isEqualTo('sendEvent');
 
 
 ___NOTES___
