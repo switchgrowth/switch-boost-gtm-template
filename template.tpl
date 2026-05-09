@@ -92,6 +92,8 @@ const pixelUrl = data.pixelUrl;
 const excludedIds = data.excludedIds || "";
 const excludedInputTypes = data.excludedInputTypes || "";
 const excludedAttributes = data.excludedAttributes || "";
+const automaticMode = data.automaticMode;
+const sessionLimit = data.sessionLimit;
 const cacheKey = "switch-" + pixelId;
 
 // Pre-load event queue: install a stub on window.Switch BEFORE pixel.js loads,
@@ -154,6 +156,12 @@ function embedScripts(onSuccess, onFail) {
   if (excludedInputTypes.length > 0 ) {
     options += "&skipped-input-types=" + excludedInputTypes.toString();
   }
+
+  let autoQuery = automaticMode ? "&auto=true" : "&auto=false";
+  options += autoQuery;
+
+  // pixel.js floors the value to 500 minimum on the receiving side
+  options += "&session-byte-limit=" + sessionLimit;
 
   const urlForPixel = pixelUrl ? pixelUrl : 'api.s10h.io';
   scriptsToEmbed.push('https://' + urlForPixel + '/pixel.js?id='+ encodeUriComponent(pixelId + options));
@@ -378,7 +386,7 @@ scenarios:
     // Tag still finishes successfully.
     assertApi('gtmOnSuccess').wasCalled();
 - name: Queue Event Idempotency Test
-  code: |
+  code: |-
     let installedSwitch = null;
 
     mock('copyFromWindow', (key) => key === 'Switch' ? installedSwitch : undefined);
