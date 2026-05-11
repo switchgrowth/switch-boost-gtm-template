@@ -50,23 +50,6 @@ ___TEMPLATE_PARAMETERS___
     "valueHint": "pixel.clientwebsite.com (no https or slashes needed)"
   },
   {
-    "type": "CHECKBOX",
-    "name": "automaticMode",
-    "checkboxText": "Automatic Mode",
-    "simpleValueType": true,
-    "help": "Automatic mode will monitor the page and capture advertising identifiers automatically for submission.",
-    "defaultValue": true
-  },
-  {
-    "type": "TEXT",
-    "name": "sessionLimit",
-    "displayName": "Session Size Limit",
-    "simpleValueType": true,
-    "defaultValue": 4000,
-    "help": "The maximum bytes that a session size can be.",
-    "valueUnit": "bytes"
-  },
-  {
     "type": "TEXT",
     "name": "excludedIds",
     "displayName": "CSS Element IDs to exclude",
@@ -101,16 +84,54 @@ ___SANDBOXED_JS_FOR_WEB_TEMPLATE___
 const injectScript = require('injectScript');
 const encodeUriComponent = require('encodeUriComponent');
 const log = require('logToConsole');
-const makeInteger = require('makeInteger');
+const setInWindow = require('setInWindow');
+const copyFromWindow = require('copyFromWindow');
 
 const pixelId = data.pixelCode;
 const pixelUrl = data.pixelUrl;
-const automaticMode = data.automaticMode;
-const sessionLimit = data.sessionLimit;
 const excludedIds = data.excludedIds || "";
 const excludedInputTypes = data.excludedInputTypes || "";
 const excludedAttributes = data.excludedAttributes || "";
+const automaticMode = data.automaticMode;
+const sessionLimit = data.sessionLimit;
 const cacheKey = "switch-" + pixelId;
+
+// Pre-load event queue: install a stub on window.Switch BEFORE pixel.js loads,
+// so calls from Switch Real-Time Event tags (or any other Switch.* caller)
+// fired during the pixel.js download window are buffered and replayed when
+// pixel.js arrives.
+//
+// Keep this `methods` array in sync with QUEUEABLE_METHODS in
+// pixel/src/eventQueue.ts. Anything missing here will throw TypeError if
+// called pre-load.
+function installSwitchStub() {
+  const existing = copyFromWindow("Switch");
+  if (existing && existing.__sgReady) return;   // real Switch already loaded
+  if (existing && existing.__queue) return;     // stub already installed (idempotent)
+
+  const queue = [];
+  const stub = { __queue: queue };
+  const methods = [
+    "sendEvent",
+    "sendTemplateEvent",
+    "sendManualCapture",
+    "setSecureCookieValues",
+    "getSecureCookieValues",
+    "deleteSecureCookie",
+    "sha256",
+    "transactionId",
+    "getUserAgent",
+    "getIp"
+  ];
+  methods.forEach(function (m) {
+    stub[m] = function () {
+      const args = [];
+      for (let i = 0; i < arguments.length; i++) args.push(arguments[i]);
+      queue.push([m, args]);
+    };
+  });
+  setInWindow("Switch", stub, true);
+}
 
 function localSuccess(script) {
   log("Loaded:", script);
@@ -123,7 +144,7 @@ function localFail(script) {
 function embedScripts(onSuccess, onFail) {
   const scriptsToEmbed = [];
   let options = "";
-  
+
   if (excludedIds.length > 0) {
     options += "&skipped-input-ids=" + excludedIds.toString();
   }
@@ -135,16 +156,15 @@ function embedScripts(onSuccess, onFail) {
   if (excludedInputTypes.length > 0 ) {
     options += "&skipped-input-types=" + excludedInputTypes.toString();
   }
-  
+
   let autoQuery = automaticMode ? "&auto=true" : "&auto=false";
-  
   options += autoQuery;
-  
-  // Script handles flooring the value to 500 minimum
+
+  // pixel.js floors the value to 500 minimum on the receiving side
   options += "&session-byte-limit=" + sessionLimit;
 
   const urlForPixel = pixelUrl ? pixelUrl : 'api.s10h.io';
-  scriptsToEmbed.push('https://' + urlForPixel + '/pixel.js?id=' + encodeUriComponent(pixelId) + options);
+  scriptsToEmbed.push('https://' + urlForPixel + '/pixel.js?id='+ encodeUriComponent(pixelId + options));
   log("Scripts to embed:", scriptsToEmbed);
 
   while(scriptsToEmbed.length) {
@@ -162,6 +182,9 @@ function embedScripts(onSuccess, onFail) {
     onFail();
   }
 }
+
+// Install the queue stub before kicking off pixel.js download.
+installSwitchStub();
 
 embedScripts(
   () => {
@@ -224,6 +247,67 @@ ___WEB_PERMISSIONS___
       "isEditedByUser": true
     },
     "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "access_globals",
+        "versionId": "1"
+      },
+      "param": [
+        {
+          "key": "keys",
+          "value": {
+            "type": 2,
+            "listItem": [
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "Switch"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "clientAnnotations": {
+      "isEditedByUser": true
+    },
+    "isRequired": true
   }
 ]
 
@@ -242,6 +326,92 @@ scenarios:
 
     // Verify that the tag finished successfully.
     assertApi('gtmOnSuccess').wasCalled();
+- name: Queue Event Test
+  code: |
+    // Capture whatever the template installs on window.Switch.
+    let installedSwitch = null;
+
+    mock('copyFromWindow', (key) => {
+      if (key === 'Switch') return installedSwitch;
+      return undefined;
+    });
+
+    mock('setInWindow', (key, value) => {
+      if (key === 'Switch') installedSwitch = value;
+      return true;
+    });
+
+    mock('injectScript', (url, onSuccess) => {
+      onSuccess();
+    });
+
+    const mockData = {
+      pixelCode: "test_pixel_id"
+    };
+
+    runCode(mockData);
+
+    // Stub was installed with an empty queue.
+    assertThat(installedSwitch).isDefined();
+    assertThat(installedSwitch.__queue).isEqualTo([]);
+
+    // All 10 queueable methods are functions on the stub.
+    const expectedMethods = [
+      'sendEvent',
+      'sendTemplateEvent',
+      'sendManualCapture',
+      'setSecureCookieValues',
+      'getSecureCookieValues',
+      'deleteSecureCookie',
+      'sha256',
+      'transactionId',
+      'getUserAgent',
+      'getIp'
+    ];
+    expectedMethods.forEach((m) => {
+      assertThat(typeof installedSwitch[m]).isEqualTo('function');
+    });
+
+    // Calling a stub method pushes a [methodName, args] tuple onto __queue.
+    installedSwitch.sendEvent('api-key', 'pipeline-A', { customer: { email: 'x' } });
+    installedSwitch.sendTemplateEvent({ apiKey: 'k', pipelineId: 'p' });
+    installedSwitch.transactionId();
+
+    assertThat(installedSwitch.__queue.length).isEqualTo(3);
+    assertThat(installedSwitch.__queue[0][0]).isEqualTo('sendEvent');
+    assertThat(installedSwitch.__queue[0][1][0]).isEqualTo('api-key');
+    assertThat(installedSwitch.__queue[1][0]).isEqualTo('sendTemplateEvent');
+    assertThat(installedSwitch.__queue[2][0]).isEqualTo('transactionId');
+
+    // Tag still finishes successfully.
+    assertApi('gtmOnSuccess').wasCalled();
+- name: Queue Event Idempotency Test
+  code: |-
+    let installedSwitch = null;
+
+    mock('copyFromWindow', (key) => key === 'Switch' ? installedSwitch : undefined);
+    mock('setInWindow', (key, value) => {
+      if (key === 'Switch') installedSwitch = value;
+      return true;
+    });
+    mock('injectScript', (url, onSuccess) => onSuccess());
+
+    // First Boost run installs the stub.
+    runCode({ pixelCode: "test_pixel_id" });
+
+    // Realtime Event tag fires between Boost runs and queues a call.
+    installedSwitch.sendEvent('api-key', 'pipeline-A', { foo: 'bar' });
+
+    const queueBefore = installedSwitch.__queue;
+    const stubBefore = installedSwitch;
+    assertThat(queueBefore.length).isEqualTo(1);
+
+    // Second Boost run must NOT replace the stub or wipe the queue.
+    runCode({ pixelCode: "test_pixel_id" });
+
+    assertThat(installedSwitch).isEqualTo(stubBefore);
+    assertThat(installedSwitch.__queue.length).isEqualTo(1);
+    assertThat(installedSwitch.__queue[0][0]).isEqualTo('sendEvent');
 
 
 ___NOTES___
