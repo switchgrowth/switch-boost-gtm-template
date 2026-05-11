@@ -17,6 +17,8 @@ documentation: "https://docs.switchgrowth.com/boost"
 versions:
   # Latest version first, other notes are not used and
   # are for reference only.
+  - sha: 08260883df381362ef51209179e0231201f3953a
+    changeNotes: Add pre-pixel event queue so Switch.* calls during pixel.js load are buffered and replayed
   - sha: dce2261fb41e4545e4cf530dbcff2f13ffac6e19
     changeNotes: Update default session size limit to 4000 bytes
   - sha: 67a879a0bd0b79ae0ce7bc5f6bc8698ad7c9ae7c
