@@ -1,0 +1,16 @@
+name: Verify metadata.yaml in sync
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify metadata.yaml top SHA matches latest template.tpl commit
+        run: bash .github/scripts/verify-metadata.sh

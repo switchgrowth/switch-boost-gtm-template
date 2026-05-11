@@ -50,6 +50,23 @@ ___TEMPLATE_PARAMETERS___
     "valueHint": "pixel.clientwebsite.com (no https or slashes needed)"
   },
   {
+    "type": "CHECKBOX",
+    "name": "automaticMode",
+    "checkboxText": "Automatic Mode",
+    "simpleValueType": true,
+    "help": "Automatic mode will monitor the page and capture advertising identifiers automatically for submission.",
+    "defaultValue": true
+  },
+  {
+    "type": "TEXT",
+    "name": "sessionLimit",
+    "displayName": "Session Size Limit",
+    "simpleValueType": true,
+    "defaultValue": 4048,
+    "help": "The maximum bytes that a session size can be.",
+    "valueUnit": "bytes"
+  },
+  {
     "type": "TEXT",
     "name": "excludedIds",
     "displayName": "CSS Element IDs to exclude",
@@ -164,7 +181,7 @@ function embedScripts(onSuccess, onFail) {
   options += "&session-byte-limit=" + sessionLimit;
 
   const urlForPixel = pixelUrl ? pixelUrl : 'api.s10h.io';
-  scriptsToEmbed.push('https://' + urlForPixel + '/pixel.js?id='+ encodeUriComponent(pixelId + options));
+  scriptsToEmbed.push('https://' + urlForPixel + '/pixel.js?id=' + encodeUriComponent(pixelId) + options);
   log("Scripts to embed:", scriptsToEmbed);
 
   while(scriptsToEmbed.length) {
@@ -412,6 +429,101 @@ scenarios:
     assertThat(installedSwitch).isEqualTo(stubBefore);
     assertThat(installedSwitch.__queue.length).isEqualTo(1);
     assertThat(installedSwitch.__queue[0][0]).isEqualTo('sendEvent');
+- name: URL options separators are not URI-encoded
+  code: |
+    // Regression guard for commit 67a879a "Fix options encoding".
+    // If encodeUriComponent is ever applied to (pixelId + options) instead
+    // of just pixelId, every '&' separator in options becomes %26 and the
+    // query params silently never reach pixel.js.
+    let capturedUrl = null;
+
+    mock('copyFromWindow', () => undefined);
+    mock('setInWindow', () => true);
+    mock('injectScript', (url, onSuccess) => {
+      capturedUrl = url;
+      onSuccess();
+    });
+
+    runCode({
+      pixelCode: "abc123",
+      automaticMode: true,
+      sessionLimit: 1000
+    });
+
+    assertThat(capturedUrl).contains('&auto=true');
+    assertThat(capturedUrl).contains('&session-byte-limit=1000');
+    assertThat(capturedUrl).doesNotContain('%26auto');
+    assertThat(capturedUrl).doesNotContain('%26session-byte-limit');
+
+    assertApi('gtmOnSuccess').wasCalled();
+- name: pixelId with special characters is URI-encoded
+  code: |
+    // Protects the other direction: if encodeUriComponent is removed from
+    // around pixelId, an id with reserved chars would break the URL.
+    let capturedUrl = null;
+
+    mock('copyFromWindow', () => undefined);
+    mock('setInWindow', () => true);
+    mock('injectScript', (url, onSuccess) => {
+      capturedUrl = url;
+      onSuccess();
+    });
+
+    runCode({
+      pixelCode: "abc 123",
+      automaticMode: false,
+      sessionLimit: 500
+    });
+
+    assertThat(capturedUrl).contains('id=abc%20123');
+    assertThat(capturedUrl).doesNotContain('id=abc 123');
+- name: Excluded lists and options appear in URL
+  code: |-
+    // Covers the option-building branches: each exclusion list, the
+    // automaticMode=false branch of the ternary, and the byte limit.
+    let capturedUrl = null;
+
+    mock('copyFromWindow', () => undefined);
+    mock('setInWindow', () => true);
+    mock('injectScript', (url, onSuccess) => {
+      capturedUrl = url;
+      onSuccess();
+    });
+
+    runCode({
+      pixelCode: "abc123",
+      excludedIds: "foo,bar",
+      excludedAttributes: "gclid",
+      excludedInputTypes: "checkbox",
+      automaticMode: false,
+      sessionLimit: 750
+    });
+
+    assertThat(capturedUrl).contains('&skipped-input-ids=foo,bar');
+    assertThat(capturedUrl).contains('&excluded-attributes=gclid');
+    assertThat(capturedUrl).contains('&skipped-input-types=checkbox');
+    assertThat(capturedUrl).contains('&auto=false');
+    assertThat(capturedUrl).contains('&session-byte-limit=750');
+- name: Custom pixelUrl overrides default domain
+  code: |-
+    let capturedUrl = null;
+
+    mock('copyFromWindow', () => undefined);
+    mock('setInWindow', () => true);
+    mock('injectScript', (url, onSuccess) => {
+      capturedUrl = url;
+      onSuccess();
+    });
+
+    runCode({
+      pixelCode: "abc123",
+      pixelUrl: "pixel.clientwebsite.com",
+      automaticMode: true,
+      sessionLimit: 500
+    });
+
+    assertThat(capturedUrl).contains('https://pixel.clientwebsite.com/pixel.js');
+    assertThat(capturedUrl).doesNotContain('api.s10h.io');
 
 
 ___NOTES___
