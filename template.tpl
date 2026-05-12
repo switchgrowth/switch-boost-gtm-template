@@ -103,6 +103,7 @@ const encodeUriComponent = require('encodeUriComponent');
 const log = require('logToConsole');
 const setInWindow = require('setInWindow');
 const copyFromWindow = require('copyFromWindow');
+const getUrl = require('getUrl');
 
 const pixelId = data.pixelCode;
 const pixelUrl = data.pixelUrl;
@@ -112,6 +113,20 @@ const excludedAttributes = data.excludedAttributes || "";
 const automaticMode = data.automaticMode;
 const sessionLimit = data.sessionLimit;
 const cacheKey = "switch-" + pixelId;
+
+// sg_debug=1 in the page URL turns on the queue-lifecycle logs below.
+// Mirrors the gating in pixel/src/debug.ts so one URL flag controls both
+// halves of the stub -> pixel-drain timeline.
+const queryString = getUrl('query') || '';
+const debugEnabled = queryString.indexOf('sg_debug=1') !== -1;
+function dlog() {
+  if (!debugEnabled) return;
+  // logToConsole has no .apply in the sandboxed runtime - switch on arity.
+  if (arguments.length === 1) { log(arguments[0]); return; }
+  if (arguments.length === 2) { log(arguments[0], arguments[1]); return; }
+  if (arguments.length === 3) { log(arguments[0], arguments[1], arguments[2]); return; }
+  log(arguments[0], arguments[1], arguments[2], arguments[3]);
+}
 
 // Pre-load event queue: install a stub on window.Switch BEFORE pixel.js loads,
 // so calls from Switch Real-Time Event tags (or any other Switch.* caller)
@@ -123,8 +138,14 @@ const cacheKey = "switch-" + pixelId;
 // called pre-load.
 function installSwitchStub() {
   const existing = copyFromWindow("Switch");
-  if (existing && existing.__sgReady) return;   // real Switch already loaded
-  if (existing && existing.__queue) return;     // stub already installed (idempotent)
+  if (existing && existing.__sgReady) {
+    dlog("[queue] real Switch already loaded, stub install skipped");
+    return;
+  }
+  if (existing && existing.__queue) {
+    dlog("[queue] stub already installed, skipping (idempotent); queue length=" + existing.__queue.length);
+    return;
+  }
 
   const queue = [];
   const stub = { __queue: queue };
@@ -144,10 +165,12 @@ function installSwitchStub() {
     stub[m] = function () {
       const args = [];
       for (let i = 0; i < arguments.length; i++) args.push(arguments[i]);
+      dlog("[queue] buffering", m, args);
       queue.push([m, args]);
     };
   });
   setInWindow("Switch", stub, true);
+  dlog("[queue] stub installed (" + methods.length + " methods)");
 }
 
 function localSuccess(script) {
@@ -317,6 +340,34 @@ ___WEB_PERMISSIONS___
                 ]
               }
             ]
+          }
+        }
+      ]
+    },
+    "clientAnnotations": {
+      "isEditedByUser": true
+    },
+    "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "get_url",
+        "versionId": "1"
+      },
+      "param": [
+        {
+          "key": "urlParts",
+          "value": {
+            "type": 1,
+            "string": "any"
+          }
+        },
+        {
+          "key": "queriesAllowed",
+          "value": {
+            "type": 1,
+            "string": "any"
           }
         }
       ]
@@ -524,6 +575,90 @@ scenarios:
 
     assertThat(capturedUrl).contains('https://pixel.clientwebsite.com/pixel.js');
     assertThat(capturedUrl).doesNotContain('api.s10h.io');
+- name: Queue logs suppressed without sg_debug=1
+  code: |
+    // No sg_debug=1 in the URL -> queue logs must not appear in console.
+    // Existing non-queue logs (Loaded:, Scripts to embed:, Switch Boost embedded)
+    // still fire so this also guards against accidentally gating them too.
+    const loggedLines = [];
+    let installedSwitch = null;
+
+    mock('getUrl', (component) => component === 'query' ? '' : '');
+
+    mock('logToConsole', function () {
+      const args = [];
+      for (let i = 0; i < arguments.length; i++) args.push(arguments[i]);
+      loggedLines.push(args);
+    });
+
+    mock('copyFromWindow', (key) => key === 'Switch' ? installedSwitch : undefined);
+    mock('setInWindow', (key, value) => {
+      if (key === 'Switch') installedSwitch = value;
+      return true;
+    });
+    mock('injectScript', (url, onSuccess) => onSuccess());
+
+    runCode({ pixelCode: "test_pixel_id" });
+
+    // Trigger a stub call to exercise the per-call buffering branch.
+    installedSwitch.sendEvent('api-key', 'pipeline-A', { foo: 'bar' });
+
+    const startsWith = (args, prefix) =>
+      args.length > 0 && typeof args[0] === 'string' && args[0].indexOf(prefix) === 0;
+
+    // Zero [queue] lines should reach the console.
+    const queueLines = loggedLines.filter((a) => startsWith(a, '[queue]'));
+    assertThat(queueLines.length).isEqualTo(0);
+
+    // Existing non-queue logs are unaffected — at least one "Loaded:" got through.
+    const loadedLines = loggedLines.filter((a) => a[0] === 'Loaded:');
+    assertThat(loadedLines.length).isEqualTo(1);
+
+    assertApi('gtmOnSuccess').wasCalled();
+- name: Queue logs fire when sg_debug=1 is set
+  code: |
+    // sg_debug=1 in the URL -> queue logs must fire. Verifies the fresh-install
+    // branch log and the per-call buffering log both make it to logToConsole.
+    const loggedLines = [];
+    let installedSwitch = null;
+
+    mock('getUrl', (component) => component === 'query' ? 'sg_debug=1' : '');
+
+
+    mock('logToConsole', function () {
+      const args = [];
+      for (let i = 0; i < arguments.length; i++) args.push(arguments[i]);
+      loggedLines.push(args);
+    });
+
+    mock('copyFromWindow', (key) => key === 'Switch' ? installedSwitch : undefined);
+    mock('setInWindow', (key, value) => {
+      if (key === 'Switch') installedSwitch = value;
+      return true;
+    });
+    mock('injectScript', (url, onSuccess) => onSuccess());
+
+    runCode({ pixelCode: "test_pixel_id" });
+
+    // Trigger a stub call so we can verify [queue] buffering fires with args.
+    installedSwitch.sendEvent('api-key', 'pipeline-A', { foo: 'bar' });
+
+    const startsWith = (args, prefix) =>
+      args.length > 0 && typeof args[0] === 'string' && args[0].indexOf(prefix) === 0;
+
+    // Fresh-install branch fired exactly once with the 10-method count.
+    const installLines = loggedLines.filter((a) => startsWith(a, '[queue] stub installed'));
+    assertThat(installLines.length).isEqualTo(1);
+    assertThat(installLines[0][0]).isEqualTo('[queue] stub installed (10 methods)');
+
+    // Per-call buffering fired with the method name as the second arg and the
+    // caller's args as the third arg (preserves PII-in-debug behavior).
+    const bufferingLines = loggedLines.filter((a) => startsWith(a, '[queue] buffering'));
+    assertThat(bufferingLines.length).isEqualTo(1);
+    assertThat(bufferingLines[0][1]).isEqualTo('sendEvent');
+    assertThat(bufferingLines[0][2][0]).isEqualTo('api-key');
+
+    assertApi('gtmOnSuccess').wasCalled();
 
 
 ___NOTES___
