@@ -17,6 +17,8 @@ documentation: "https://docs.switchgrowth.com/boost"
 versions:
   # Latest version first, other notes are not used and
   # are for reference only.
+  - sha: 8634e7dc59bdf578cc4478a7087986663daa527d
+    changeNotes: Add event queue logging
   - sha: 50ff37ce2594f360ad7edcc4b1d533f09ea5b724
     changeNotes: Fixing missing field.
   - sha: 08260883df381362ef51209179e0231201f3953a
