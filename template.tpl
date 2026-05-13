@@ -103,6 +103,7 @@ const encodeUriComponent = require('encodeUriComponent');
 const log = require('logToConsole');
 const setInWindow = require('setInWindow');
 const copyFromWindow = require('copyFromWindow');
+const createQueue = require('createQueue');
 const getUrl = require('getUrl');
 
 const pixelId = data.pixelCode;
@@ -128,10 +129,21 @@ function dlog() {
   log(arguments[0], arguments[1], arguments[2], arguments[3]);
 }
 
-// Pre-load event queue: install a stub on window.Switch BEFORE pixel.js loads,
-// so calls from Switch Real-Time Event tags (or any other Switch.* caller)
-// fired during the pixel.js download window are buffered and replayed when
-// pixel.js arrives.
+// Pre-load event queue.
+//
+// Before pixel.js loads, this template:
+//   1. Initializes a page-side global array at window.__sgQueue via GTM's
+//      createQueue API. This array survives the sandbox boundary, so both the
+//      sandboxed stub methods (below) and page-context pixel.js read/write the
+//      same array. A closure array attached to the stub would not — GTM's
+//      setInWindow copies objects across the sandbox boundary rather than
+//      exposing them by reference.
+//   2. Installs a stub on window.Switch whose methods push [methodName, args]
+//      to window.__sgQueue.
+//
+// When pixel.js arrives, its drainQueueIntoSwitch() reads window.__sgQueue,
+// replays each buffered call on the real Switch instance, swaps window.Switch
+// over, and marks __sgReady=true.
 //
 // Keep this `methods` array in sync with QUEUEABLE_METHODS in
 // pixel/src/eventQueue.ts. Anything missing here will throw TypeError if
@@ -142,13 +154,13 @@ function installSwitchStub() {
     dlog("[queue] real Switch already loaded, stub install skipped");
     return;
   }
-  if (existing && existing.__queue) {
-    dlog("[queue] stub already installed, skipping (idempotent); queue length=" + existing.__queue.length);
-    return;
-  }
 
-  const queue = [];
-  const stub = { __queue: queue };
+  // createQueue is idempotent: repeated calls return a push function tied to
+  // the same window.__sgQueue array, so multiple Switch Boost tags across
+  // containers all cooperate without conflict.
+  const pushSgQueue = createQueue('__sgQueue');
+
+  const stub = {};
   const methods = [
     "sendEvent",
     "sendTemplateEvent",
@@ -166,7 +178,7 @@ function installSwitchStub() {
       const args = [];
       for (let i = 0; i < arguments.length; i++) args.push(arguments[i]);
       dlog("[queue] buffering", m, args);
-      queue.push([m, args]);
+      pushSgQueue([m, args]);
     };
   });
   setInWindow("Switch", stub, true);
@@ -338,6 +350,45 @@ ___WEB_PERMISSIONS___
                     "boolean": true
                   }
                 ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "__sgQueue"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  }
+                ]
               }
             ]
           }
@@ -384,10 +435,8 @@ ___TESTS___
 
 scenarios:
 - name: Has a Pixel ID
-  code: |-
-    const mockData = {
-      pixelId: "test_id"
-    };
+  code: |2-
+
 
     // Call runCode to run the template's code.
     runCode(mockData);
@@ -396,72 +445,17 @@ scenarios:
     assertApi('gtmOnSuccess').wasCalled();
 - name: Queue Event Test
   code: |
-    // Capture whatever the template installs on window.Switch.
     let installedSwitch = null;
-
-    mock('copyFromWindow', (key) => {
-      if (key === 'Switch') return installedSwitch;
-      return undefined;
-    });
-
-    mock('setInWindow', (key, value) => {
-      if (key === 'Switch') installedSwitch = value;
-      return true;
-    });
-
-    mock('injectScript', (url, onSuccess) => {
-      onSuccess();
-    });
-
-    const mockData = {
-      pixelCode: "test_pixel_id"
-    };
-
-    runCode(mockData);
-
-    // Stub was installed with an empty queue.
-    assertThat(installedSwitch).isDefined();
-    assertThat(installedSwitch.__queue).isEqualTo([]);
-
-    // All 10 queueable methods are functions on the stub.
-    const expectedMethods = [
-      'sendEvent',
-      'sendTemplateEvent',
-      'sendManualCapture',
-      'setSecureCookieValues',
-      'getSecureCookieValues',
-      'deleteSecureCookie',
-      'sha256',
-      'transactionId',
-      'getUserAgent',
-      'getIp'
-    ];
-    expectedMethods.forEach((m) => {
-      assertThat(typeof installedSwitch[m]).isEqualTo('function');
-    });
-
-    // Calling a stub method pushes a [methodName, args] tuple onto __queue.
-    installedSwitch.sendEvent('api-key', 'pipeline-A', { customer: { email: 'x' } });
-    installedSwitch.sendTemplateEvent({ apiKey: 'k', pipelineId: 'p' });
-    installedSwitch.transactionId();
-
-    assertThat(installedSwitch.__queue.length).isEqualTo(3);
-    assertThat(installedSwitch.__queue[0][0]).isEqualTo('sendEvent');
-    assertThat(installedSwitch.__queue[0][1][0]).isEqualTo('api-key');
-    assertThat(installedSwitch.__queue[1][0]).isEqualTo('sendTemplateEvent');
-    assertThat(installedSwitch.__queue[2][0]).isEqualTo('transactionId');
-
-    // Tag still finishes successfully.
-    assertApi('gtmOnSuccess').wasCalled();
-- name: Queue Event Idempotency Test
-  code: |-
-    let installedSwitch = null;
+    const sgQueue = [];
 
     mock('copyFromWindow', (key) => key === 'Switch' ? installedSwitch : undefined);
     mock('setInWindow', (key, value) => {
       if (key === 'Switch') installedSwitch = value;
       return true;
     });
+    // Model createQueue's idempotency: every call returns a push function tied
+    // to the same underlying array. In production this is window.__sgQueue.
+    mock('createQueue', () => function (entry) { sgQueue.push(entry); });
     mock('injectScript', (url, onSuccess) => onSuccess());
 
     // First Boost run installs the stub.
@@ -469,17 +463,57 @@ scenarios:
 
     // Realtime Event tag fires between Boost runs and queues a call.
     installedSwitch.sendEvent('api-key', 'pipeline-A', { foo: 'bar' });
+    assertThat(sgQueue.length).isEqualTo(1);
 
-    const queueBefore = installedSwitch.__queue;
-    const stubBefore = installedSwitch;
-    assertThat(queueBefore.length).isEqualTo(1);
-
-    // Second Boost run must NOT replace the stub or wipe the queue.
+    // Second Boost run must NOT wipe the queue. The stub on window.Switch may
+    // be a new instance (we no longer short-circuit on existing.__queue), but
+    // createQueue's idempotency guarantees the queue itself persists.
     runCode({ pixelCode: "test_pixel_id" });
 
-    assertThat(installedSwitch).isEqualTo(stubBefore);
-    assertThat(installedSwitch.__queue.length).isEqualTo(1);
-    assertThat(installedSwitch.__queue[0][0]).isEqualTo('sendEvent');
+    assertThat(sgQueue.length).isEqualTo(1);
+    assertThat(sgQueue[0][0]).isEqualTo('sendEvent');
+    assertThat(sgQueue[0][1][0]).isEqualTo('api-key');
+
+    // New stub from the second run is still functional and pushes to the same queue.
+    installedSwitch.transactionId();
+    assertThat(sgQueue.length).isEqualTo(2);
+    assertThat(sgQueue[1][0]).isEqualTo('transactionId');
+- name: Queue Event Idempotency Test
+  code: |
+    let installedSwitch = null;
+    const sgQueue = [];
+
+    mock('copyFromWindow', (key) => key === 'Switch' ? installedSwitch : undefined);
+    mock('setInWindow', (key, value) => {
+      if (key === 'Switch') installedSwitch = value;
+      return true;
+    });
+    // Model createQueue's idempotency: every call returns a push function tied
+    // to the same underlying array. In production this is window.__sgQueue.
+    mock('createQueue', () => function (entry) { sgQueue.push(entry); });
+    mock('injectScript', (url, onSuccess) => onSuccess());
+
+    // First Boost run installs the stub.
+    runCode({ pixelCode: "test_pixel_id" });
+
+    // Realtime Event tag fires between Boost runs and queues a call.
+    installedSwitch.sendEvent('api-key', 'pipeline-A', { foo: 'bar' });
+    assertThat(sgQueue.length).isEqualTo(1);
+
+    // Second Boost run must NOT wipe the queue.
+    // The stub on window.Switch may be a new instance (we no longer short-circuit
+    // on existing.__queue), but createQueue's idempotency guarantees the queue
+    // itself persists.
+    runCode({ pixelCode: "test_pixel_id" });
+
+    assertThat(sgQueue.length).isEqualTo(1);
+    assertThat(sgQueue[0][0]).isEqualTo('sendEvent');
+    assertThat(sgQueue[0][1][0]).isEqualTo('api-key');
+
+    // New stub from the second run is still functional and pushes to the same queue.
+    installedSwitch.transactionId();
+    assertThat(sgQueue.length).isEqualTo(2);
+    assertThat(sgQueue[1][0]).isEqualTo('transactionId');
 - name: URL options separators are not URI-encoded
   code: |
     // Regression guard for commit 67a879a "Fix options encoding".
@@ -616,7 +650,7 @@ scenarios:
 
     assertApi('gtmOnSuccess').wasCalled();
 - name: Queue logs fire when sg_debug=1 is set
-  code: |
+  code: |-
     // sg_debug=1 in the URL -> queue logs must fire. Verifies the fresh-install
     // branch log and the per-call buffering log both make it to logToConsole.
     const loggedLines = [];
@@ -659,6 +693,93 @@ scenarios:
     assertThat(bufferingLines[0][2][0]).isEqualTo('api-key');
 
     assertApi('gtmOnSuccess').wasCalled();
+- name: createQueue is called with __sgQueue
+  code: |-
+    let createQueueName;
+    mock('createQueue', (name) => { createQueueName = name; return function () {}; });
+
+    runCode(mockData);
+
+    assertThat(createQueueName).isEqualTo('__sgQueue');
+- name: Stub no longer has __queue (regression guard for closure-array reintroduction)
+  code: |-
+    let installedStub;
+    mock('setInWindow', (name, value) => { installedStub = value; return true; });
+
+    runCode(mockData);
+
+    // The old closure-array pattern attached __queue directly to the stub. The
+    // new pattern uses window.__sgQueue (via createQueue) so the stub must NOT
+    // carry __queue — otherwise pixel.js's legacy-fallback drain path would
+    // double-read the same entries.
+    assertThat(installedStub.__queue).isEqualTo(undefined);
+- name: Stub methods push via createQueue's push function
+  code: |
+    let installedStub;
+    const pushed = [];
+    mock('setInWindow', (name, value) => { installedStub = value; return true; });
+    mock('createQueue', () => function (entry) { pushed.push(entry); });
+
+    runCode(mockData);
+
+    installedStub.sendTemplateEvent({ apiKey: 'k', pipelineId: 'p' });
+    installedStub.transactionId();
+
+    assertThat(pushed.length).isEqualTo(2);
+    assertThat(pushed[0][0]).isEqualTo('sendTemplateEvent');
+    assertThat(pushed[1][0]).isEqualTo('transactionId');
+- name: Stub install order createQueue and setInWindow both happen before injectScript
+  code: |-
+    const calls = [];
+    mock('setInWindow', (name) => { if (name === 'Switch') calls.push('setInWindow'); return true; });
+    mock('createQueue', () => { calls.push('createQueue'); return function () {}; });
+    mock('injectScript', (url, onSuccess) => { calls.push('injectScript'); onSuccess(); });
+
+    runCode(mockData);
+
+    // Both halves of the stub install must complete before pixel.js download
+    // starts — otherwise the brief window between injectScript and the stub
+    // being installed would drop calls.
+    const setInWindowIdx = calls.indexOf('setInWindow');
+    const createQueueIdx = calls.indexOf('createQueue');
+    const injectScriptIdx = calls.indexOf('injectScript');
+
+    assertThat(setInWindowIdx).isGreaterThan(-1);
+    assertThat(createQueueIdx).isGreaterThan(-1);
+    assertThat(setInWindowIdx).isLessThan(injectScriptIdx);
+    assertThat(createQueueIdx).isLessThan(injectScriptIdx);
+- name: Stub install skipped when window Switch__sgReady is true (real Switch already
+    loaded)
+  code: |-
+    let setInWindowCalled = false;
+    let createQueueCalled = false;
+    mock('copyFromWindow', (name) => {
+      if (name === 'Switch') return { __sgReady: true };
+    });
+    mock('setInWindow', () => { setInWindowCalled = true; return true; });
+    mock('createQueue', () => { createQueueCalled = true; return function () {}; });
+
+    runCode(mockData);
+
+    assertThat(setInWindowCalled).isEqualTo(false);
+    assertThat(createQueueCalled).isEqualTo(false);
+setup: |
+  const mockData = {
+    pixelCode: 'test-pixel-id',
+    pixelUrl: '',
+    excludedIds: '',
+    excludedInputTypes: '',
+    excludedAttributes: '',
+    automaticMode: true,
+    sessionLimit: 4000
+  };
+
+  mock('getUrl', () => '');
+  mock('copyFromWindow', () => undefined);
+  mock('setInWindow', () => true);
+  mock('createQueue', () => function () {});
+  mock('injectScript', (url, onSuccess) => { onSuccess(); });
+  mock('logToConsole', () => {});
 
 
 ___NOTES___
