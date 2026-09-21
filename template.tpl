@@ -105,6 +105,7 @@ const setInWindow = require('setInWindow');
 const copyFromWindow = require('copyFromWindow');
 const createQueue = require('createQueue');
 const getUrl = require('getUrl');
+const templateStorage = require('templateStorage');
 
 const pixelId = data.pixelCode;
 const pixelUrl = data.pixelUrl;
@@ -114,6 +115,9 @@ const excludedAttributes = data.excludedAttributes || "";
 const automaticMode = data.automaticMode;
 const sessionLimit = data.sessionLimit;
 const cacheKey = "switch-" + pixelId;
+// templateStorage is per-template and lives for the page, which is exactly the
+// scope of "have we already installed the stub here?".
+const STUB_INSTALLED = 'sgStubInstalled';
 
 // sg_debug=1 in the page URL turns on the queue-lifecycle logs below.
 // Mirrors the gating in pixel/src/debug.ts so one URL flag controls both
@@ -149,8 +153,27 @@ function dlog() {
 // pixel/src/eventQueue.ts. Anything missing here will throw TypeError if
 // called pre-load.
 function installSwitchStub() {
-  const existing = copyFromWindow("Switch");
-  if (existing && existing.__sgReady) {
+  // Install once per page. The stub only exists to buffer calls made before
+  // pixel.js parses, and pixel.js parses once — so a second run can only do
+  // harm. GTM's default tag firing option is "Once per event", not "Once per
+  // page", so this function really does get re-entered on most containers.
+  //
+  // templateStorage is the signal rather than window.Switch because
+  // copyFromWindow cannot copy a class instance with private fields: it returns
+  // undefined for the real Switch, so the old
+  // `copyFromWindow("Switch").__sgReady` guard here could never fire. That is
+  // how a stub came to replace a fully loaded Switch, and since injectScript's
+  // cacheKey stops pixel.js re-executing, nothing ever drained it again.
+  if (templateStorage.getItem(STUB_INSTALLED)) {
+    dlog("[queue] stub already installed on this page, skipping");
+    return;
+  }
+
+  // A second GTM container carrying its own copy of this template has its own
+  // templateStorage and cannot see the check above, so fall back to the plain
+  // boolean pixel.js publishes. An older pixel.js leaves it undefined and we
+  // install as before.
+  if (copyFromWindow('__sgReady') === true) {
     dlog("[queue] real Switch already loaded, stub install skipped");
     return;
   }
@@ -182,6 +205,7 @@ function installSwitchStub() {
     };
   });
   setInWindow("Switch", stub, true);
+  templateStorage.setItem(STUB_INSTALLED, true);
   dlog("[queue] stub installed (" + methods.length + " methods)");
 }
 
@@ -389,6 +413,45 @@ ___WEB_PERMISSIONS___
                     "boolean": true
                   }
                 ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "__sgReady"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  }
+                ]
               }
             ]
           }
@@ -422,6 +485,19 @@ ___WEB_PERMISSIONS___
           }
         }
       ]
+    },
+    "clientAnnotations": {
+      "isEditedByUser": true
+    },
+    "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "access_template_storage",
+        "versionId": "1"
+      },
+      "param": []
     },
     "clientAnnotations": {
       "isEditedByUser": true
@@ -465,52 +541,17 @@ scenarios:
     installedSwitch.sendEvent('api-key', 'pipeline-A', { foo: 'bar' });
     assertThat(sgQueue.length).isEqualTo(1);
 
-    // Second Boost run must NOT wipe the queue. The stub on window.Switch may
-    // be a new instance (we no longer short-circuit on existing.__queue), but
-    // createQueue's idempotency guarantees the queue itself persists.
+    // Second Boost run must NOT wipe the queue. It no longer reinstalls the stub
+    // at all — templateStorage says one is already on the page — so the entry
+    // queued between the two runs has to survive untouched.
     runCode({ pixelCode: "test_pixel_id" });
 
     assertThat(sgQueue.length).isEqualTo(1);
     assertThat(sgQueue[0][0]).isEqualTo('sendEvent');
     assertThat(sgQueue[0][1][0]).isEqualTo('api-key');
 
-    // New stub from the second run is still functional and pushes to the same queue.
-    installedSwitch.transactionId();
-    assertThat(sgQueue.length).isEqualTo(2);
-    assertThat(sgQueue[1][0]).isEqualTo('transactionId');
-- name: Queue Event Idempotency Test
-  code: |
-    let installedSwitch = null;
-    const sgQueue = [];
-
-    mock('copyFromWindow', (key) => key === 'Switch' ? installedSwitch : undefined);
-    mock('setInWindow', (key, value) => {
-      if (key === 'Switch') installedSwitch = value;
-      return true;
-    });
-    // Model createQueue's idempotency: every call returns a push function tied
-    // to the same underlying array. In production this is window.__sgQueue.
-    mock('createQueue', () => function (entry) { sgQueue.push(entry); });
-    mock('injectScript', (url, onSuccess) => onSuccess());
-
-    // First Boost run installs the stub.
-    runCode({ pixelCode: "test_pixel_id" });
-
-    // Realtime Event tag fires between Boost runs and queues a call.
-    installedSwitch.sendEvent('api-key', 'pipeline-A', { foo: 'bar' });
-    assertThat(sgQueue.length).isEqualTo(1);
-
-    // Second Boost run must NOT wipe the queue.
-    // The stub on window.Switch may be a new instance (we no longer short-circuit
-    // on existing.__queue), but createQueue's idempotency guarantees the queue
-    // itself persists.
-    runCode({ pixelCode: "test_pixel_id" });
-
-    assertThat(sgQueue.length).isEqualTo(1);
-    assertThat(sgQueue[0][0]).isEqualTo('sendEvent');
-    assertThat(sgQueue[0][1][0]).isEqualTo('api-key');
-
-    // New stub from the second run is still functional and pushes to the same queue.
+    // The stub from the first run is still the one on window.Switch, and still
+    // pushes to the same queue.
     installedSwitch.transactionId();
     assertThat(sgQueue.length).isEqualTo(2);
     assertThat(sgQueue[1][0]).isEqualTo('transactionId');
@@ -748,13 +789,20 @@ scenarios:
     assertThat(createQueueIdx).isGreaterThan(-1);
     assertThat(setInWindowIdx).isLessThan(injectScriptIdx);
     assertThat(createQueueIdx).isLessThan(injectScriptIdx);
-- name: Stub install skipped when window Switch__sgReady is true (real Switch already
-    loaded)
+- name: Stub install skipped when window __sgReady is true (real Switch already loaded)
   code: |-
+    // This scenario used to mock copyFromWindow('Switch') as returning a plain
+    // { __sgReady: true } and assert the guard skipped. A plain object copies
+    // fine across the sandbox, so the guard passed here and failed in
+    // production, where copyFromWindow returns undefined for a class instance
+    // with private fields. That mock is why a stub shipped that could replace a
+    // fully loaded Switch. It now returns undefined for 'Switch' — production
+    // truth — and the guard reads the plain boolean pixel.js publishes instead.
     let setInWindowCalled = false;
     let createQueueCalled = false;
     mock('copyFromWindow', (name) => {
-      if (name === 'Switch') return { __sgReady: true };
+      if (name === 'Switch') return undefined;
+      if (name === '__sgReady') return true;
     });
     mock('setInWindow', () => { setInWindowCalled = true; return true; });
     mock('createQueue', () => { createQueueCalled = true; return function () {}; });
@@ -763,6 +811,37 @@ scenarios:
 
     assertThat(setInWindowCalled).isEqualTo(false);
     assertThat(createQueueCalled).isEqualTo(false);
+- name: Stub is installed only once per page even when the tag fires repeatedly
+  code: |-
+    // GTM's default tag firing option is "Once per event", so Boost re-enters on
+    // every dataLayer event. Before the templateStorage guard the second run
+    // called setInWindow again, which on a page where pixel.js had already
+    // drained replaced the real Switch with a buffering stub that nothing would
+    // ever drain — injectScript's cacheKey stops pixel.js re-executing.
+    let setInWindowCount = 0;
+    mock('setInWindow', (name) => {
+      if (name === 'Switch') setInWindowCount++;
+      return true;
+    });
+
+    runCode(mockData);
+    runCode(mockData);
+    runCode(mockData);
+
+    assertThat(setInWindowCount).isEqualTo(1);
+- name: Repeat fires still reach embedScripts and gtmOnSuccess
+  code: |-
+    // The early return lives inside installSwitchStub(), not at the top of the
+    // tag. Turning it into a whole-tag exit would break Set-up Tag sequencing on
+    // every container that uses Boost that way.
+    let injectCount = 0;
+    mock('injectScript', (url, onSuccess) => { injectCount++; onSuccess(); });
+
+    runCode(mockData);
+    runCode(mockData);
+
+    assertThat(injectCount).isEqualTo(2);
+    assertApi('gtmOnSuccess').wasCalled();
 setup: |
   const mockData = {
     pixelCode: 'test-pixel-id',
@@ -780,6 +859,22 @@ setup: |
   mock('createQueue', () => function () {});
   mock('injectScript', (url, onSuccess) => { onSuccess(); });
   mock('logToConsole', () => {});
+
+  // installSwitchStub() now skips when this key is already set, so every
+  // scenario needs its own empty store. Whether the Tests runner resets the
+  // real templateStorage between scenarios is undocumented, and betting a suite
+  // on unverified sandbox semantics is the exact mistake this change fixes.
+  // Note this means the access_template_storage permission is NOT exercised by
+  // the suite — GTM skips permission checks on mocked APIs. It is enforced by
+  // the editor instead, which refuses to save a template that calls an API it
+  // lacks permission for.
+  let templateStorageData = {};
+  mock('templateStorage', {
+    getItem: (k) => templateStorageData[k],
+    setItem: (k, v) => { templateStorageData[k] = v; },
+    removeItem: (k) => { templateStorageData[k] = undefined; },
+    clear: () => { templateStorageData = {}; }
+  });
 
 
 ___NOTES___
