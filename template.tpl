@@ -860,20 +860,24 @@ setup: |
   mock('injectScript', (url, onSuccess) => { onSuccess(); });
   mock('logToConsole', () => {});
 
-  // installSwitchStub() now skips when this key is already set, so every
-  // scenario needs its own empty store. Whether the Tests runner resets the
-  // real templateStorage between scenarios is undocumented, and betting a suite
-  // on unverified sandbox semantics is the exact mistake this change fixes.
-  // Note this means the access_template_storage permission is NOT exercised by
-  // the suite — GTM skips permission checks on mocked APIs. It is enforced by
-  // the editor instead, which refuses to save a template that calls an API it
-  // lacks permission for.
-  let templateStorageData = {};
-  mock('templateStorage', {
-    getItem: (k) => templateStorageData[k],
-    setItem: (k, v) => { templateStorageData[k] = v; },
-    removeItem: (k) => { templateStorageData[k] = undefined; },
-    clear: () => { templateStorageData = {}; }
+  // The Tests runner does NOT reset real template storage between scenarios —
+  // verified: leaving it real made the first runCode set the install key, and
+  // every later scenario that asserts on a stub install then failed with
+  // "Can't read property sendEvent of null". installSwitchStub() now depends on
+  // that key, so each scenario needs its own store.
+  //
+  // mockObject, not mock: mock() takes a return value or a replacement function,
+  // so an object whose properties are functions loses them and you get
+  // "TypeError: Object has no 'getItem' property". mockObject exists for
+  // object-shaped APIs like this one.
+  //
+  // `setup` runs before each scenario, so `store` is fresh every time.
+  let store = {};
+  mockObject('templateStorage', {
+    getItem: function (k) { return store[k]; },
+    setItem: function (k, v) { store[k] = v; },
+    removeItem: function (k) { store[k] = undefined; },
+    clear: function () { store = {}; }
   });
 
 
