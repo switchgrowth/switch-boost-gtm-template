@@ -17,6 +17,10 @@ documentation: "https://docs.switchgrowth.com/boost"
 versions:
   # Latest version first, other notes are not used and
   # are for reference only.
+  - sha: 85d52c65e7742dcb7ae527cdeca8eb281f007df6
+    changeNotes: Give each test scenario its own template storage
+  - sha: 3e53ac7257208e1b9abf52f7eb8c2cd0597d8e76
+    changeNotes: Install the pre-load stub once per page
   - sha: 782110a4dc22fadc9a75b47d63c6b3b01eac4e57
     changeNotes: Improvements to Event Queue
   - sha: 8634e7dc59bdf578cc4478a7087986663daa527d
