@@ -22,22 +22,35 @@ Prerequisites (one-time, not per client):
 Per client:
 
 1. Check they're a good fit: they already have Boost; they have an ECL tag (or another tag firing
-   on lead-form submit) with variables holding the email and/or phone; their match rate is low.
+   on lead-form submit); their match rate is low.
 2. Accept the Switch Boost template update in their container, if it hasn't been done. Their
    existing Boost tag keeps working unchanged.
-3. Add one tag: Tags → New → Switch Boost:
+3. Find a variable that holds just the email (and one for the phone). Where it comes from depends
+   on how their ECL user-provided data is set up:
+   - **Manual configuration:** reuse its per-field email and phone variables.
+   - **Code:** don't reuse it. That variable returns an object (`{ email, phone_number, ... }`),
+     which the pixel can't read, so nothing is sent while the tag still succeeds.
+   - **Automatic detection:** there's no variable to reuse.
+
+   For code or automatic, use a Data Layer variable if the form pushes the email to the data
+   layer, or a Custom JavaScript variable that reads the form field:
+   ```js
+   function () { var el = document.getElementById('email'); return el ? el.value : undefined; }
+   ```
+4. Add one tag: Tags → New → Switch Boost:
    - **Tag Type:** Send known email and phone
-   - **Email:** the same variable their ECL tag uses, e.g. `{{DLV - email}}`
-   - **Phone:** the same for phone, if they have one
+   - **Email:** the email variable from step 3
+   - **Phone:** the phone variable, if they have one
    - **Phone Country:** leave blank for US/Canada. Set e.g. `GB` only if numbers are typed
      without a country code
    - **Trigger:** the same trigger as their ECL tag
-4. Preview and check: submit their real form in Preview with `?sg_debug=1&gclid=test` on the URL.
-   Tags fired should include the new tag; the console should show
+5. Preview and check: submit their real form in Preview with `?sg_debug=1&gclid=test` on the URL.
+   On the Form Submit event, the email variable should show a plain email address; Tags fired
+   should include the new tag; the console should show
    `[known capture] dispatched to the loaded Switch`; Network should show `api/pixel` with status
    200.
-5. Publish the container.
-6. Measure: compare their Boost match rate before and after, from the Boost stats in Switch.
+6. Publish the container.
+7. Measure: compare their Boost match rate before and after, from the Boost stats in Switch.
 
 ### Things that can trip it up
 
