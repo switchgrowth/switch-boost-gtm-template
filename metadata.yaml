@@ -17,7 +17,7 @@ documentation: "https://docs.switchgrowth.com/boost"
 versions:
   # Latest version first, other notes are not used and
   # are for reference only.
-  - sha: a8abde1edeb0f0a510a005cdeea0e0074bfcdee7
+  - sha: 40768f52c3317fe92f063151dbaa052eba356852
     changeNotes: Optionally generate Meta _fbp and _fbc cookies when missing
   - sha: 85d52c65e7742dcb7ae527cdeca8eb281f007df6
     changeNotes: Give each test scenario its own template storage
