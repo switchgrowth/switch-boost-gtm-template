@@ -54,8 +54,8 @@ Per client:
 
 ### Things that can trip it up
 
-- **No Setup tag on the page:** the send tag reports failed in Preview. It relies on the Setup tag
-  to load the pixel.
+- **No Boost on the page:** the send tag reports failed in Preview. It needs a Setup tag on the
+  page, or pixel.js installed directly on the site, and never loads the pixel itself.
 - **Consent:** if the client's consent setup blocks tags until the visitor accepts, neither Boost
   tag fires for visitors who decline, the same as ECL.
 - **Very fast submits:** a submit before the pixel has loaded logs "pre-load queue". If the page

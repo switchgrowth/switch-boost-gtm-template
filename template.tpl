@@ -135,7 +135,7 @@ ___TEMPLATE_PARAMETERS___
         "name": "email",
         "displayName": "Email",
         "simpleValueType": true,
-        "help": "Variable holding the user\u0027s email. Usually the same variable as your ECL tag."
+        "help": "Variable holding just the user\u0027s email. If your ECL tag uses code or automatic user-provided data, see the README for which variable to use."
       },
       {
         "type": "TEXT",
@@ -349,20 +349,24 @@ function sendKnownCapture() {
     return;
   }
 
-  // window.__sgQueue is created by installSwitchStub, so its presence proves a
-  // Setup tag ran. window.Switch can't be checked directly: copyFromWindow
-  // returns undefined for the loaded Switch (an instance of a class with private fields).
-  if (!copyFromWindow('__sgQueue')) {
+  // window.__sgReady is set once pixel.js has loaded, however it was installed.
+  // Before that, a call lands in the pre-load queue and is replayed when
+  // pixel.js loads, so it is lost if the form submit navigates away first. GTM
+  // reports success either way; the dispatch log is the only place the
+  // difference shows.
+  const ready = copyFromWindow('__sgReady') === true;
+
+  // Something must receive the call: either the loaded pixel, or the pre-load
+  // queue a Setup tag creates. Both are checked because pixel.js only reads
+  // window.__sgQueue and never creates it, so on a page that loads pixel.js
+  // outside GTM the queue never exists. window.Switch can't be checked
+  // directly: copyFromWindow returns undefined for the loaded Switch (an
+  // instance of a class with private fields).
+  if (!ready && !copyFromWindow('__sgQueue')) {
     log("Switch Boost - Send known email and phone needs a Setup tag on the page");
     data.gtmOnFailure();
     return;
   }
-
-  // window.__sgReady is set once pixel.js has loaded. Before that, the call
-  // lands in the pre-load queue and is replayed when pixel.js loads, so it is
-  // lost if the form submit navigates away first. GTM reports success either
-  // way; this log is the only place the difference shows.
-  const ready = copyFromWindow('__sgReady') === true;
 
   callInWindow('Switch.sendKnownCapture', email, phone, phoneCountry);
 
@@ -1083,6 +1087,18 @@ scenarios:
     assertThat(windowCalls.length).isEqualTo(0);
     assertApi('gtmOnFailure').wasCalled();
     assertApi('gtmOnSuccess').wasNotCalled();
+- name: Known capture sends when pixel loaded outside GTM with no Setup tag
+  code: |-
+    // pixel.js publishes __sgReady wherever it is installed, but only a Setup
+    // tag creates __sgQueue, so a site loading pixel.js directly has no queue.
+    mock('copyFromWindow', (key) => key === '__sgReady' ? true : undefined);
+
+    runCode({ tagType: 'knownCapture', email: 'jane@example.com' });
+
+    assertThat(windowCalls.length).isEqualTo(1);
+    assertThat(windowCalls[0][0]).isEqualTo('Switch.sendKnownCapture');
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
 - name: Known capture never installs the stub or loads the pixel
   code: |-
     let stubInstalled = false;
