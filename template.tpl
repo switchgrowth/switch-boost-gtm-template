@@ -58,6 +58,14 @@ ___TEMPLATE_PARAMETERS___
     "defaultValue": true
   },
   {
+    "type": "CHECKBOX",
+    "name": "generateMetaIds",
+    "checkboxText": "Generate Meta IDs when missing",
+    "simpleValueType": true,
+    "help": "Sets Meta's browser and click ID cookies (_fbp and _fbc) if the Meta pixel hasn't yet, so Boost can send them from the first event. Existing cookies are left as they are. Use only on sites that also run the Meta pixel. Works best when this tag fires on Initialization. Nothing is set when ad_storage consent is denied.",
+    "defaultValue": false
+  },
+  {
     "type": "TEXT",
     "name": "sessionLimit",
     "displayName": "Session Size Limit",
@@ -106,6 +114,12 @@ const copyFromWindow = require('copyFromWindow');
 const createQueue = require('createQueue');
 const getUrl = require('getUrl');
 const templateStorage = require('templateStorage');
+const getCookieValues = require('getCookieValues');
+const setCookie = require('setCookie');
+const getTimestampMillis = require('getTimestampMillis');
+const generateRandom = require('generateRandom');
+const getQueryParameters = require('getQueryParameters');
+const isConsentGranted = require('isConsentGranted');
 
 const pixelId = data.pixelCode;
 const pixelUrl = data.pixelUrl;
@@ -259,6 +273,53 @@ function embedScripts(onSuccess, onFail) {
   }
 }
 
+const META_COOKIE_MAX_AGE_SECONDS = 7776000; // 90 days, same as Meta's pixel
+
+// Meta's pixel stores the cookie's domain level inside the value ("fb.<level>.…") and
+// re-writes the cookie on that level every visit, so pick the level the way it does:
+// try the shortest domain first and keep the first one the browser accepts.
+function writeMetaCookie(name, buildValue) {
+  const labels = getUrl('host').split('.');
+  for (let level = 0; level < labels.length; level++) {
+    const domain = labels.slice(labels.length - 1 - level).join('.');
+    const value = buildValue(level);
+    setCookie(name, value, {
+      domain: domain,
+      path: '/',
+      'max-age': META_COOKIE_MAX_AGE_SECONDS,
+      samesite: 'Lax',
+      secure: true
+    });
+    if (getCookieValues(name).indexOf(value) !== -1) {
+      dlog("[meta] wrote " + name + " on " + domain, value);
+      return;
+    }
+  }
+  dlog("[meta] no domain accepted " + name);
+}
+
+// Fills in Meta's browser and click IDs when Meta's pixel hasn't written them yet, so
+// pixel.js can send them on the first event. Meta's pixel adopts any well-formed _fbp
+// it finds, so both sides end up sending the same ID.
+function generateMetaIds() {
+  if (!data.generateMetaIds || !isConsentGranted('ad_storage')) return;
+
+  if (!getCookieValues('_fbp')[0]) {
+    // Same shape as the IDs Meta mints: two random 9-digit numbers joined.
+    const random = '' + generateRandom(100000000, 999999999) + generateRandom(100000000, 999999999);
+    const createdAt = getTimestampMillis();
+    writeMetaCookie('_fbp', (level) => 'fb.' + level + '.' + createdAt + '.' + random);
+  }
+
+  // Only when missing: replacing could leave a second _fbc on another domain, and pixel.js
+  // sends no fbc when the name appears twice. Meta's pixel swaps in a new fbclid itself.
+  const fbclid = getQueryParameters('fbclid');
+  if (fbclid && !getCookieValues('_fbc')[0]) {
+    const clickedAt = getTimestampMillis();
+    writeMetaCookie('_fbc', (level) => 'fb.' + level + '.' + clickedAt + '.' + fbclid);
+  }
+}
+
 // Install the queue stub before kicking off pixel.js download.
 installSwitchStub();
 
@@ -272,6 +333,10 @@ embedScripts(
     data.gtmOnFailure();
   }
 );
+
+// Last, so nothing here can stop Boost loading. pixel.js can't run until this
+// synchronous code finishes, so the cookies still exist before its first send.
+generateMetaIds();
 
 
 ___WEB_PERMISSIONS___
@@ -498,6 +563,212 @@ ___WEB_PERMISSIONS___
         "versionId": "1"
       },
       "param": []
+    },
+    "clientAnnotations": {
+      "isEditedByUser": true
+    },
+    "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "get_cookies",
+        "versionId": "1"
+      },
+      "param": [
+        {
+          "key": "cookieAccess",
+          "value": {
+            "type": 1,
+            "string": "specific"
+          }
+        },
+        {
+          "key": "cookieNames",
+          "value": {
+            "type": 2,
+            "listItem": [
+              {
+                "type": 1,
+                "string": "_fbp"
+              },
+              {
+                "type": 1,
+                "string": "_fbc"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "clientAnnotations": {
+      "isEditedByUser": true
+    },
+    "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "set_cookies",
+        "versionId": "1"
+      },
+      "param": [
+        {
+          "key": "allowedCookies",
+          "value": {
+            "type": 2,
+            "listItem": [
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "name"
+                  },
+                  {
+                    "type": 1,
+                    "string": "domain"
+                  },
+                  {
+                    "type": 1,
+                    "string": "path"
+                  },
+                  {
+                    "type": 1,
+                    "string": "secure"
+                  },
+                  {
+                    "type": 1,
+                    "string": "session"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "_fbp"
+                  },
+                  {
+                    "type": 1,
+                    "string": "*"
+                  },
+                  {
+                    "type": 1,
+                    "string": "*"
+                  },
+                  {
+                    "type": 1,
+                    "string": "any"
+                  },
+                  {
+                    "type": 1,
+                    "string": "any"
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "name"
+                  },
+                  {
+                    "type": 1,
+                    "string": "domain"
+                  },
+                  {
+                    "type": 1,
+                    "string": "path"
+                  },
+                  {
+                    "type": 1,
+                    "string": "secure"
+                  },
+                  {
+                    "type": 1,
+                    "string": "session"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "_fbc"
+                  },
+                  {
+                    "type": 1,
+                    "string": "*"
+                  },
+                  {
+                    "type": 1,
+                    "string": "*"
+                  },
+                  {
+                    "type": 1,
+                    "string": "any"
+                  },
+                  {
+                    "type": 1,
+                    "string": "any"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "clientAnnotations": {
+      "isEditedByUser": true
+    },
+    "isRequired": true
+  },
+  {
+    "instance": {
+      "key": {
+        "publicId": "access_consent",
+        "versionId": "1"
+      },
+      "param": [
+        {
+          "key": "consentTypes",
+          "value": {
+            "type": 2,
+            "listItem": [
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "consentType"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "ad_storage"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
     },
     "clientAnnotations": {
       "isEditedByUser": true
@@ -842,6 +1113,110 @@ scenarios:
 
     assertThat(injectCount).isEqualTo(2);
     assertApi('gtmOnSuccess').wasCalled();
+- name: Meta IDs are not generated when the checkbox is off
+  code: |-
+    fbclid = 'IwAR0AbC';
+
+    runCode(mockData);
+
+    assertApi('setCookie').wasNotCalled();
+- name: Meta IDs are not generated without ad_storage consent
+  code: |-
+    adStorageGranted = false;
+    fbclid = 'IwAR0AbC';
+
+    runCode(metaData);
+
+    assertApi('setCookie').wasNotCalled();
+    assertApi('gtmOnSuccess').wasCalled();
+- name: Meta _fbp is created on the shortest domain the browser accepts
+  code: |-
+    runCode(metaData);
+
+    // "com" is refused, "example.com" sticks, so the value encodes level 1.
+    assertThat(cookiesNamed('_fbp')).isEqualTo(['fb.1.1760000000000.123456789123456789']);
+    assertThat(jar[0].domain).isEqualTo('example.com');
+    const accepted = cookieWrites[cookieWrites.length - 1].options;
+    assertThat(accepted.path).isEqualTo('/');
+    assertThat(accepted['max-age']).isEqualTo(7776000);
+    assertThat(accepted.samesite).isEqualTo('Lax');
+    assertThat(accepted.secure).isEqualTo(true);
+- name: Meta _fbp level skips a two-part public suffix
+  code: |-
+    host = 'www.shop.co.uk';
+
+    runCode(metaData);
+
+    assertThat(cookiesNamed('_fbp')).isEqualTo(['fb.2.1760000000000.123456789123456789']);
+    assertThat(jar[0].domain).isEqualTo('shop.co.uk');
+- name: An existing _fbp is never touched
+  code: |-
+    jar.push({ name: '_fbp', domain: 'example.com', value: 'fb.1.1700000000000.42' });
+
+    runCode(metaData);
+
+    assertApi('setCookie').wasNotCalled();
+    assertThat(cookiesNamed('_fbp')).isEqualTo(['fb.1.1700000000000.42']);
+- name: Repeat fires keep the first _fbp
+  code: |-
+    // Boost re-fires on every dataLayer event; only the first may mint.
+    runCode(metaData);
+    const writesAfterFirstRun = cookieWrites.length;
+    runCode(metaData);
+
+    assertThat(cookieWrites.length).isEqualTo(writesAfterFirstRun);
+    assertThat(cookiesNamed('_fbp').length).isEqualTo(1);
+- name: Meta _fbc is created from fbclid with its case kept
+  code: |-
+    jar.push({ name: '_fbp', domain: 'example.com', value: 'fb.1.1700000000000.42' });
+    fbclid = 'IwAR0AbC_xyz-Q';
+
+    runCode(metaData);
+
+    assertThat(cookiesNamed('_fbc')).isEqualTo(['fb.1.1760000000000.IwAR0AbC_xyz-Q']);
+    assertThat(cookiesNamed('_fbp')).isEqualTo(['fb.1.1700000000000.42']);
+- name: An existing Meta _fbc is never touched even when fbclid differs
+  code: |-
+    // A host-only _fbc from another writer: a replacement on example.com would sit
+    // beside it, and pixel.js sends no fbc when the name appears twice.
+    jar.push({ name: '_fbp', domain: 'example.com', value: 'fb.1.1700000000000.42' });
+    jar.push({ name: '_fbc', domain: 'www.example.com', value: 'fb.1.1700000000000.OldClick' });
+    fbclid = 'NewClick';
+
+    runCode(metaData);
+
+    assertApi('setCookie').wasNotCalled();
+    assertThat(cookiesNamed('_fbc')).isEqualTo(['fb.1.1700000000000.OldClick']);
+- name: Meta cookie writes are logged with sg_debug=1
+  code: |-
+    const loggedLines = [];
+    mock('getUrl', (component) => {
+      if (component === 'host') return host;
+      return component === 'query' ? 'sg_debug=1' : '';
+    });
+    mock('logToConsole', function () {
+      const args = [];
+      for (let i = 0; i < arguments.length; i++) args.push(arguments[i]);
+      loggedLines.push(args);
+    });
+
+    runCode(metaData);
+
+    const metaLines = loggedLines.filter((a) => typeof a[0] === 'string' && a[0].indexOf('[meta]') === 0);
+    assertThat(metaLines).isEqualTo([['[meta] wrote _fbp on example.com', 'fb.1.1760000000000.123456789123456789']]);
+- name: Boost loads before any Meta cookie is written
+  code: |-
+    // Anything generateMetaIds() throws can't stop pixel.js or gtmOnSuccess.
+    const calls = [];
+    mock('injectScript', (url, onSuccess) => { calls.push('injectScript'); onSuccess(); });
+    mock('logToConsole', (line) => { if (line === 'Switch Boost embedded') calls.push('embedded'); });
+    mock('setCookie', () => { calls.push('setCookie'); });
+
+    runCode(metaData);
+
+    assertThat(calls.indexOf('injectScript')).isEqualTo(0);
+    assertThat(calls.indexOf('embedded')).isEqualTo(1);
+    assertThat(calls.indexOf('setCookie')).isEqualTo(2);
 setup: |
   const mockData = {
     pixelCode: 'test-pixel-id',
@@ -852,8 +1227,41 @@ setup: |
     automaticMode: true,
     sessionLimit: 4000
   };
+  const metaData = {
+    pixelCode: 'test-pixel-id',
+    pixelUrl: '',
+    excludedIds: '',
+    excludedInputTypes: '',
+    excludedAttributes: '',
+    automaticMode: true,
+    sessionLimit: 4000,
+    generateMetaIds: true
+  };
 
-  mock('getUrl', () => '');
+  // Scenarios reassign these to set up the page.
+  let host = 'www.example.com';
+  let fbclid;
+  let adStorageGranted = true;
+
+  mock('getUrl', (component) => component === 'host' ? host : '');
+  mock('getQueryParameters', (key) => key === 'fbclid' ? fbclid : undefined);
+  mock('isConsentGranted', (type) => type === 'ad_storage' ? adStorageGranted : true);
+  mock('getTimestampMillis', () => 1760000000000);
+  mock('generateRandom', () => 123456789);
+
+  // A fake browser cookie jar: refuses a bare TLD or a public suffix, and a
+  // write to the same name and domain replaces the old cookie.
+  const PUBLIC_SUFFIXES = ['co.uk'];
+  let jar = [];
+  const cookieWrites = [];
+  const cookiesNamed = (name) => jar.filter((c) => c.name === name).map((c) => c.value);
+  mock('getCookieValues', cookiesNamed);
+  mock('setCookie', (name, value, options) => {
+    cookieWrites.push({ name: name, value: value, options: options });
+    if (options.domain.split('.').length < 2 || PUBLIC_SUFFIXES.indexOf(options.domain) !== -1) return;
+    jar = jar.filter((c) => !(c.name === name && c.domain === options.domain));
+    jar.push({ name: name, domain: options.domain, value: value });
+  });
   mock('copyFromWindow', () => undefined);
   mock('setInWindow', () => true);
   mock('createQueue', () => function () {});
