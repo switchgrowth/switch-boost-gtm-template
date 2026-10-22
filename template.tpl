@@ -62,7 +62,7 @@ ___TEMPLATE_PARAMETERS___
     "name": "generateMetaIds",
     "checkboxText": "Generate Meta IDs when missing",
     "simpleValueType": true,
-    "help": "Creates the Meta _fbp cookie (and _fbc from an fbclid in the URL) on Initialization when they don't exist yet. Never changes an existing _fbp. Only runs when ad_storage consent is granted.",
+    "help": "Creates the Meta _fbp cookie, and _fbc from an fbclid in the URL, when they are missing. Never changes existing values. Tick only on sites running the Meta pixel: elsewhere Meta has never seen the ID, so it has nothing to match. Runs on this tag's trigger; fire it on Initialization so the IDs exist before the first Boost event. Skipped when ad_storage is denied, but without Consent Mode that check always passes, so gate this tag with its consent settings.",
     "defaultValue": false
   },
   {
@@ -290,13 +290,12 @@ function writeMetaCookie(name, buildValue) {
       samesite: 'Lax',
       secure: true
     });
-    if (getCookieValues(name).indexOf(value) !== -1) return;
+    if (getCookieValues(name).indexOf(value) !== -1) {
+      dlog("[meta] wrote " + name + " on " + domain, value);
+      return;
+    }
   }
-}
-
-// fb.<level>.<createdAtMs>.<fbclid>: the click ID is the fourth segment.
-function storedFbclid(fbc) {
-  return fbc.split('.')[3];
+  dlog("[meta] no domain accepted " + name);
 }
 
 // Fills in Meta's browser and click IDs when Meta's pixel hasn't written them yet, so
@@ -312,10 +311,10 @@ function generateMetaIds() {
     writeMetaCookie('_fbp', (level) => 'fb.' + level + '.' + createdAt + '.' + random);
   }
 
-  // Case-sensitive: Meta rejects an fbc whose click ID was altered.
+  // Only when missing: replacing could leave a second _fbc on another domain, and pixel.js
+  // sends no fbc when the name appears twice. Meta's pixel swaps in a new fbclid itself.
   const fbclid = getQueryParameters('fbclid');
-  const fbc = getCookieValues('_fbc')[0];
-  if (fbclid && (!fbc || storedFbclid(fbc) !== fbclid)) {
+  if (fbclid && !getCookieValues('_fbc')[0]) {
     const clickedAt = getTimestampMillis();
     writeMetaCookie('_fbc', (level) => 'fb.' + level + '.' + clickedAt + '.' + fbclid);
   }
@@ -1176,43 +1175,35 @@ scenarios:
 
     assertThat(cookiesNamed('_fbc')).isEqualTo(['fb.1.1760000000000.IwAR0AbC_xyz-Q']);
     assertThat(cookiesNamed('_fbp')).isEqualTo(['fb.1.1700000000000.42']);
-- name: Meta _fbc is replaced when fbclid differs
+- name: An existing Meta _fbc is never touched even when fbclid differs
   code: |-
+    // A host-only _fbc from another writer: a replacement on example.com would sit
+    // beside it, and pixel.js sends no fbc when the name appears twice.
     jar.push({ name: '_fbp', domain: 'example.com', value: 'fb.1.1700000000000.42' });
-    jar.push({ name: '_fbc', domain: 'example.com', value: 'fb.1.1700000000000.OldClick' });
+    jar.push({ name: '_fbc', domain: 'www.example.com', value: 'fb.1.1700000000000.OldClick' });
     fbclid = 'NewClick';
 
     runCode(metaData);
 
-    assertThat(cookiesNamed('_fbc')).isEqualTo(['fb.1.1760000000000.NewClick']);
-- name: Meta _fbc is replaced when fbclid is a prefix of the stored one
-  code: |-
-    jar.push({ name: '_fbp', domain: 'example.com', value: 'fb.1.1700000000000.42' });
-    jar.push({ name: '_fbc', domain: 'example.com', value: 'fb.1.1700000000000.ClickABC' });
-    fbclid = 'ClickAB';
-
-    runCode(metaData);
-
-    assertThat(cookiesNamed('_fbc')).isEqualTo(['fb.1.1760000000000.ClickAB']);
-- name: Meta _fbc is left alone when fbclid matches
-  code: |-
-    jar.push({ name: '_fbp', domain: 'example.com', value: 'fb.1.1700000000000.42' });
-    jar.push({ name: '_fbc', domain: 'example.com', value: 'fb.1.1700000000000.SameClick' });
-    fbclid = 'SameClick';
-
-    runCode(metaData);
-
     assertApi('setCookie').wasNotCalled();
-- name: Meta _fbc is replaced when fbclid differs only in case
+    assertThat(cookiesNamed('_fbc')).isEqualTo(['fb.1.1700000000000.OldClick']);
+- name: Meta cookie writes are logged with sg_debug=1
   code: |-
-    // Click IDs are case-sensitive, so a differently-cased fbclid is a different click.
-    jar.push({ name: '_fbp', domain: 'example.com', value: 'fb.1.1700000000000.42' });
-    jar.push({ name: '_fbc', domain: 'example.com', value: 'fb.1.1700000000000.sameclick' });
-    fbclid = 'SameClick';
+    const loggedLines = [];
+    mock('getUrl', (component) => {
+      if (component === 'host') return host;
+      return component === 'query' ? 'sg_debug=1' : '';
+    });
+    mock('logToConsole', function () {
+      const args = [];
+      for (let i = 0; i < arguments.length; i++) args.push(arguments[i]);
+      loggedLines.push(args);
+    });
 
     runCode(metaData);
 
-    assertThat(cookiesNamed('_fbc')).isEqualTo(['fb.1.1760000000000.SameClick']);
+    const metaLines = loggedLines.filter((a) => typeof a[0] === 'string' && a[0].indexOf('[meta]') === 0);
+    assertThat(metaLines).isEqualTo([['[meta] wrote _fbp on example.com', 'fb.1.1760000000000.123456789123456789']]);
 - name: Boost loads before any Meta cookie is written
   code: |-
     // Anything generateMetaIds() throws can't stop pixel.js or gtmOnSuccess.
