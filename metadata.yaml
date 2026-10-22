@@ -17,6 +17,12 @@ documentation: "https://docs.switchgrowth.com/boost"
 versions:
   # Latest version first, other notes are not used and
   # are for reference only.
+  - sha: da75f7c1d80de0b296ba41f6eca5acf6f4a01caf
+    changeNotes: Combine the send tag type with Meta ID generation
+  - sha: a113c4631a892f90164d09f5f9e1d4eb2d852740
+    changeNotes: Let the send tag run when pixel.js is loaded outside GTM
+  - sha: 0d8704cbc280b1cf12a8350a4e5a65ee94bf1320
+    changeNotes: Add a Send known email and phone tag type
   - sha: 2a5637dcc372006201d352d7415467022dbef994
     changeNotes: Optionally generate Meta _fbp and _fbc cookies when missing
   - sha: 85d52c65e7742dcb7ae527cdeca8eb281f007df6

@@ -27,79 +27,147 @@ ___INFO___
 
 
 ___TEMPLATE_PARAMETERS___
-
 [
   {
-    "type": "TEXT",
-    "name": "pixelCode",
-    "displayName": "Switch Pixel ID",
-    "simpleValueType": true,
-    "help": "This is your Switch account\u0027s pixel ID. If you don\u0027t know your pixel ID, please reach out to your Switch representative.",
-    "valueValidators": [
+    "type": "SELECT",
+    "name": "tagType",
+    "displayName": "Tag Type",
+    "macrosInSelect": false,
+    "selectItems": [
       {
-        "type": "NON_EMPTY"
+        "value": "setup",
+        "displayValue": "Setup (page load)"
+      },
+      {
+        "value": "knownCapture",
+        "displayValue": "Send known email and phone"
+      }
+    ],
+    "simpleValueType": true,
+    "defaultValue": "setup",
+    "help": "Setup loads Boost on every page. Send known email and phone passes a form\u0027s email and phone to Boost; fire it with your Enhanced Conversions for Leads tag."
+  },
+  {
+    "type": "GROUP",
+    "name": "setupGroup",
+    "groupStyle": "NO_ZIPPY",
+    "subParams": [
+      {
+        "type": "TEXT",
+        "name": "pixelCode",
+        "displayName": "Switch Pixel ID",
+        "simpleValueType": true,
+        "help": "This is your Switch account\u0027s pixel ID. If you don\u0027t know your pixel ID, please reach out to your Switch representative.",
+        "valueValidators": [
+          {
+            "type": "NON_EMPTY"
+          }
+        ]
+      },
+      {
+        "type": "TEXT",
+        "name": "pixelUrl",
+        "displayName": "First Party Pixel Domain",
+        "simpleValueType": true,
+        "help": "This value should only be set if Switch has setup the Boost pixel to fire from within the clients infrastructure via DNS records. \u003cstrong\u003eDefaults to api.s10h.io\u003c/strong\u003e",
+        "valueHint": "pixel.clientwebsite.com (no https or slashes needed)"
+      },
+      {
+        "type": "CHECKBOX",
+        "name": "automaticMode",
+        "checkboxText": "Automatic Mode",
+        "simpleValueType": true,
+        "help": "Automatic mode will monitor the page and capture advertising identifiers automatically for submission.",
+        "defaultValue": true
+      },
+      {
+        "type": "CHECKBOX",
+        "name": "generateMetaIds",
+        "checkboxText": "Generate Meta IDs when missing",
+        "simpleValueType": true,
+        "help": "Sets Meta\u0027s browser and click ID cookies (_fbp and _fbc) if the Meta pixel hasn\u0027t yet, so Boost can send them from the first event. Existing cookies are left as they are. Use only on sites that also run the Meta pixel. Works best when this tag fires on Initialization. Nothing is set when ad_storage consent is denied.",
+        "defaultValue": false
+      },
+      {
+        "type": "TEXT",
+        "name": "sessionLimit",
+        "displayName": "Session Size Limit",
+        "simpleValueType": true,
+        "defaultValue": 4048,
+        "help": "The maximum bytes that a session size can be.",
+        "valueUnit": "bytes"
+      },
+      {
+        "type": "TEXT",
+        "name": "excludedIds",
+        "displayName": "CSS Element IDs to exclude",
+        "simpleValueType": true,
+        "textAsList": true,
+        "help": "Enter IDs (one per line) that Boost should ignore",
+        "lineCount": 10
+      },
+      {
+        "type": "TEXT",
+        "name": "excludedAttributes",
+        "displayName": "Attributes to exclude",
+        "simpleValueType": true,
+        "textAsList": true,
+        "help": "Specific attrubytes (like gclid, ipaddress, etc) that Boost should not collect",
+        "lineCount": 10
+      },
+      {
+        "type": "TEXT",
+        "name": "excludedInputTypes",
+        "displayName": "Input Types to Exclude",
+        "simpleValueType": true,
+        "textAsList": true,
+        "help": "Input types Boost should ignore. By default, Boost ignores password, hidden and file input types.",
+        "lineCount": 5
+      }
+    ],
+    "enablingConditions": [
+      {
+        "paramName": "tagType",
+        "paramValue": "knownCapture",
+        "type": "NOT_EQUALS"
       }
     ]
   },
   {
-    "type": "TEXT",
-    "name": "pixelUrl",
-    "displayName": "First Party Pixel Domain",
-    "simpleValueType": true,
-    "help": "This value should only be set if Switch has setup the Boost pixel to fire from within the clients infrastructure via DNS records. \u003cstrong\u003eDefaults to api.s10h.io\u003c/strong\u003e",
-    "valueHint": "pixel.clientwebsite.com (no https or slashes needed)"
-  },
-  {
-    "type": "CHECKBOX",
-    "name": "automaticMode",
-    "checkboxText": "Automatic Mode",
-    "simpleValueType": true,
-    "help": "Automatic mode will monitor the page and capture advertising identifiers automatically for submission.",
-    "defaultValue": true
-  },
-  {
-    "type": "CHECKBOX",
-    "name": "generateMetaIds",
-    "checkboxText": "Generate Meta IDs when missing",
-    "simpleValueType": true,
-    "help": "Sets Meta's browser and click ID cookies (_fbp and _fbc) if the Meta pixel hasn't yet, so Boost can send them from the first event. Existing cookies are left as they are. Use only on sites that also run the Meta pixel. Works best when this tag fires on Initialization. Nothing is set when ad_storage consent is denied.",
-    "defaultValue": false
-  },
-  {
-    "type": "TEXT",
-    "name": "sessionLimit",
-    "displayName": "Session Size Limit",
-    "simpleValueType": true,
-    "defaultValue": 4048,
-    "help": "The maximum bytes that a session size can be.",
-    "valueUnit": "bytes"
-  },
-  {
-    "type": "TEXT",
-    "name": "excludedIds",
-    "displayName": "CSS Element IDs to exclude",
-    "simpleValueType": true,
-    "textAsList": true,
-    "help": "Enter IDs (one per line) that Boost should ignore",
-    "lineCount": 10
-  },
-  {
-    "type": "TEXT",
-    "name": "excludedAttributes",
-    "displayName": "Attributes to exclude",
-    "simpleValueType": true,
-    "textAsList": true,
-    "help": "Specific attrubytes (like gclid, ipaddress, etc) that Boost should not collect",
-    "lineCount": 10
-  },
-  {
-    "type": "TEXT",
-    "name": "excludedInputTypes",
-    "displayName": "Input Types to Exclude",
-    "simpleValueType": true,
-    "textAsList": true,
-    "help": "Input types Boost should ignore. By default, Boost ignores password, hidden and file input types.",
-    "lineCount": 5
+    "type": "GROUP",
+    "name": "knownCaptureGroup",
+    "groupStyle": "NO_ZIPPY",
+    "subParams": [
+      {
+        "type": "TEXT",
+        "name": "email",
+        "displayName": "Email",
+        "simpleValueType": true,
+        "help": "Variable holding just the user\u0027s email. If your ECL tag uses code or automatic user-provided data, see the README for which variable to use."
+      },
+      {
+        "type": "TEXT",
+        "name": "phone",
+        "displayName": "Phone",
+        "simpleValueType": true,
+        "help": "Variable holding the user\u0027s phone number. Any common format."
+      },
+      {
+        "type": "TEXT",
+        "name": "phoneCountry",
+        "displayName": "Phone Country",
+        "simpleValueType": true,
+        "valueHint": "US",
+        "help": "Two-letter country code for numbers entered without one. Defaults to US."
+      }
+    ],
+    "enablingConditions": [
+      {
+        "paramName": "tagType",
+        "paramValue": "knownCapture",
+        "type": "EQUALS"
+      }
+    ]
   }
 ]
 
@@ -114,6 +182,7 @@ const copyFromWindow = require('copyFromWindow');
 const createQueue = require('createQueue');
 const getUrl = require('getUrl');
 const templateStorage = require('templateStorage');
+const callInWindow = require('callInWindow');
 const getCookieValues = require('getCookieValues');
 const setCookie = require('setCookie');
 const getTimestampMillis = require('getTimestampMillis');
@@ -202,6 +271,7 @@ function installSwitchStub() {
     "sendEvent",
     "sendTemplateEvent",
     "sendManualCapture",
+    "sendKnownCapture",
     "setSecureCookieValues",
     "getSecureCookieValues",
     "deleteSecureCookie",
@@ -320,23 +390,81 @@ function generateMetaIds() {
   }
 }
 
-// Install the queue stub before kicking off pixel.js download.
-installSwitchStub();
 
-embedScripts(
-  () => {
-    log("Switch Boost embedded");
+// "Send known email and phone" tag: fires on a form submit (the ECL trigger)
+// and hands the form's raw email and phone to the pixel, which hashes them
+// the way automatic mode does. It relies on Boost already being on the page
+// (a Setup tag, or pixel.js installed directly), and never installs the stub
+// or loads pixel.js itself, because that needs the Setup tag's pixel ID and
+// settings.
+function sendKnownCapture() {
+  const email = data.email;
+  const phone = data.phone;
+  // Blank means "use the pixel's default". pixel.js already falls back for an
+  // empty string, but passing undefined states that intent at the call.
+  const phoneCountry = data.phoneCountry || undefined;
+
+  // A form submitted without either field is normal (the variables resolve
+  // empty), not a tag failure.
+  if (!email && !phone) {
+    dlog("[known capture] no email or phone, nothing to send");
     data.gtmOnSuccess();
-  },
-  () => {
-    log("Switch Boost unable to initialize");
-    data.gtmOnFailure();
+    return;
   }
-);
 
-// Last, so nothing here can stop Boost loading. pixel.js can't run until this
-// synchronous code finishes, so the cookies still exist before its first send.
-generateMetaIds();
+  // window.__sgReady is set once pixel.js has loaded, however it was installed.
+  // Before that, a call lands in the pre-load queue and is replayed when
+  // pixel.js loads, so it is lost if the form submit navigates away first. GTM
+  // reports success either way; the dispatch log is the only place the
+  // difference shows.
+  const ready = copyFromWindow('__sgReady') === true;
+
+  // Something must receive the call: either the loaded pixel, or the pre-load
+  // queue a Setup tag creates. Both are checked because pixel.js only reads
+  // window.__sgQueue and never creates it, so on a page that loads pixel.js
+  // outside GTM the queue never exists. window.Switch can't be checked
+  // directly: copyFromWindow returns undefined for the loaded Switch (an
+  // instance of a class with private fields).
+  if (!ready && !copyFromWindow('__sgQueue')) {
+    log("Switch Boost - Send known email and phone needs a Setup tag on the page");
+    data.gtmOnFailure();
+    return;
+  }
+
+  callInWindow('Switch.sendKnownCapture', email, phone, phoneCountry);
+
+  dlog("[known capture] dispatched to " + (ready
+    ? "the loaded Switch"
+    : "the pre-load queue (lost if the page navigates before pixel.js loads)"));
+
+  data.gtmOnSuccess();
+}
+
+// Tags saved before Tag Type existed have no value for it, so anything other
+// than knownCapture is a Setup tag and behaves exactly as before.
+if (data.tagType === 'knownCapture') {
+  sendKnownCapture();
+} else {
+  // Install the queue stub before kicking off pixel.js download.
+  installSwitchStub();
+
+  embedScripts(
+    () => {
+      log("Switch Boost embedded");
+      data.gtmOnSuccess();
+    },
+    () => {
+      log("Switch Boost unable to initialize");
+      data.gtmOnFailure();
+    }
+  );
+
+  // Last, so nothing here can stop Boost loading. pixel.js can't run until this
+  // synchronous code finishes, so the cookies still exist before its first send.
+  // Setup only: a send tag fires on form submit, after pixel.js has already
+  // read the cookies.
+  generateMetaIds();
+}
 
 
 ___WEB_PERMISSIONS___
@@ -515,6 +643,45 @@ ___WEB_PERMISSIONS___
                   {
                     "type": 8,
                     "boolean": false
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "mapKey": [
+                  {
+                    "type": 1,
+                    "string": "key"
+                  },
+                  {
+                    "type": 1,
+                    "string": "read"
+                  },
+                  {
+                    "type": 1,
+                    "string": "write"
+                  },
+                  {
+                    "type": 1,
+                    "string": "execute"
+                  }
+                ],
+                "mapValue": [
+                  {
+                    "type": 1,
+                    "string": "Switch.sendKnownCapture"
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": false
+                  },
+                  {
+                    "type": 8,
+                    "boolean": true
                   }
                 ]
               }
@@ -992,10 +1159,10 @@ scenarios:
     const startsWith = (args, prefix) =>
       args.length > 0 && typeof args[0] === 'string' && args[0].indexOf(prefix) === 0;
 
-    // Fresh-install branch fired exactly once with the 10-method count.
+    // Fresh-install branch fired exactly once with the 11-method count.
     const installLines = loggedLines.filter((a) => startsWith(a, '[queue] stub installed'));
     assertThat(installLines.length).isEqualTo(1);
-    assertThat(installLines[0][0]).isEqualTo('[queue] stub installed (10 methods)');
+    assertThat(installLines[0][0]).isEqualTo('[queue] stub installed (11 methods)');
 
     // Per-call buffering fired with the method name as the second arg and the
     // caller's args as the third arg (preserves PII-in-debug behavior).
@@ -1040,6 +1207,23 @@ scenarios:
     assertThat(pushed.length).isEqualTo(2);
     assertThat(pushed[0][0]).isEqualTo('sendTemplateEvent');
     assertThat(pushed[1][0]).isEqualTo('transactionId');
+- name: Stub buffers sendKnownCapture with its raw arguments
+  code: |-
+    // A "Send known email and phone" tag fires on a form submit that can beat
+    // pixel.js to the page, so the stub must accept its call and keep the raw
+    // values for pixel.js to hash on replay.
+    let installedStub;
+    const pushed = [];
+    mock('setInWindow', (name, value) => { installedStub = value; return true; });
+    mock('createQueue', () => function (entry) { pushed.push(entry); });
+
+    runCode(mockData);
+
+    installedStub.sendKnownCapture('jane@example.com', '(415) 555-2671', 'US');
+
+    assertThat(pushed.length).isEqualTo(1);
+    assertThat(pushed[0][0]).isEqualTo('sendKnownCapture');
+    assertThat(pushed[0][1]).isEqualTo(['jane@example.com', '(415) 555-2671', 'US']);
 - name: Stub install order createQueue and setInWindow both happen before injectScript
   code: |-
     const calls = [];
@@ -1113,6 +1297,147 @@ scenarios:
 
     assertThat(injectCount).isEqualTo(2);
     assertApi('gtmOnSuccess').wasCalled();
+- name: A tag saved before Tag Type existed still runs Setup
+  code: |-
+    // mockData has no tagType, like every Boost tag already in a container.
+    let injected = false;
+    mock('injectScript', (url, onSuccess) => { injected = true; onSuccess(); });
+
+    runCode(mockData);
+
+    assertThat(injected).isTrue();
+    assertThat(windowCalls.length).isEqualTo(0);
+    assertApi('gtmOnSuccess').wasCalled();
+- name: Known capture sends the email, phone and country to the pixel
+  code: |-
+    mock('copyFromWindow', (key) => key === '__sgQueue' ? [] : undefined);
+
+    runCode({ tagType: 'knownCapture', email: 'jane@example.com', phone: '(415) 555-2671', phoneCountry: 'GB' });
+
+    assertThat(windowCalls.length).isEqualTo(1);
+    assertThat(windowCalls[0]).isEqualTo(['Switch.sendKnownCapture', 'jane@example.com', '(415) 555-2671', 'GB']);
+    assertApi('gtmOnSuccess').wasCalled();
+- name: Known capture passes values through raw, including a numeric phone
+  code: |-
+    // Hashing belongs to pixel.js so it matches automatic mode; the tag must
+    // not lowercase, trim or hash anything itself.
+    mock('copyFromWindow', (key) => key === '__sgQueue' ? [] : undefined);
+
+    runCode({ tagType: 'knownCapture', email: ' Jane.Doe@Gmail.com ', phone: 4155552671 });
+
+    assertThat(windowCalls[0][0]).isEqualTo('Switch.sendKnownCapture');
+    assertThat(windowCalls[0][1]).isEqualTo(' Jane.Doe@Gmail.com ');
+    assertThat(windowCalls[0][2]).isEqualTo(4155552671);
+    assertThat(windowCalls[0][3]).isUndefined();
+- name: Known capture leaves a blank country undefined so the pixel uses its default
+  code: |-
+    mock('copyFromWindow', (key) => key === '__sgQueue' ? [] : undefined);
+
+    runCode({ tagType: 'knownCapture', email: 'jane@example.com', phone: '', phoneCountry: '' });
+
+    assertThat(windowCalls[0][3]).isUndefined();
+- name: Known capture sends with only a phone
+  code: |-
+    mock('copyFromWindow', (key) => key === '__sgQueue' ? [] : undefined);
+
+    runCode({ tagType: 'knownCapture', email: '', phone: '(415) 555-2671' });
+
+    assertThat(windowCalls.length).isEqualTo(1);
+    assertApi('gtmOnSuccess').wasCalled();
+- name: Known capture succeeds without sending when both values are empty
+  code: |-
+    mock('copyFromWindow', (key) => key === '__sgQueue' ? [] : undefined);
+
+    runCode({ tagType: 'knownCapture', email: '', phone: undefined });
+
+    assertThat(windowCalls.length).isEqualTo(0);
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: Known capture fails without sending when no Setup tag has run
+  code: |-
+    // The shared setup's copyFromWindow returns undefined for everything, so
+    // there is no __sgQueue on this page.
+    runCode({ tagType: 'knownCapture', email: 'jane@example.com' });
+
+    assertThat(windowCalls.length).isEqualTo(0);
+    assertApi('gtmOnFailure').wasCalled();
+    assertApi('gtmOnSuccess').wasNotCalled();
+- name: Known capture sends when pixel loaded outside GTM with no Setup tag
+  code: |-
+    // pixel.js publishes __sgReady wherever it is installed, but only a Setup
+    // tag creates __sgQueue, so a site loading pixel.js directly has no queue.
+    mock('copyFromWindow', (key) => key === '__sgReady' ? true : undefined);
+
+    runCode({ tagType: 'knownCapture', email: 'jane@example.com' });
+
+    assertThat(windowCalls.length).isEqualTo(1);
+    assertThat(windowCalls[0][0]).isEqualTo('Switch.sendKnownCapture');
+    assertApi('gtmOnSuccess').wasCalled();
+    assertApi('gtmOnFailure').wasNotCalled();
+- name: Known capture never writes Meta cookies
+  code: |-
+    // Meta ID generation belongs to the Setup tag. A send tag fires on form
+    // submit, after pixel.js has read the cookies, so it must not write them
+    // even if a stale generateMetaIds value is saved on the tag.
+    fbclid = 'IwAR0AbC';
+    mock('copyFromWindow', (key) => key === '__sgQueue' ? [] : undefined);
+
+    runCode({ tagType: 'knownCapture', email: 'jane@example.com', generateMetaIds: true });
+
+    assertThat(cookieWrites.length).isEqualTo(0);
+    assertThat(windowCalls.length).isEqualTo(1);
+- name: Known capture never installs the stub or loads the pixel
+  code: |-
+    let stubInstalled = false;
+    let injected = false;
+    mock('copyFromWindow', (key) => key === '__sgQueue' ? [] : undefined);
+    mock('setInWindow', () => { stubInstalled = true; return true; });
+    mock('injectScript', (url, onSuccess) => { injected = true; onSuccess(); });
+
+    runCode({ tagType: 'knownCapture', email: 'jane@example.com' });
+
+    assertThat(stubInstalled).isFalse();
+    assertThat(injected).isFalse();
+- name: Known capture names the loaded Switch under sg_debug=1
+  code: |-
+    const logged = [];
+    mock('getUrl', (component) => component === 'query' ? 'sg_debug=1' : '');
+    mock('logToConsole', function (m) { logged.push(m); });
+    mock('copyFromWindow', (key) => {
+      if (key === '__sgQueue') return [];
+      if (key === '__sgReady') return true;
+      return undefined;
+    });
+
+    runCode({ tagType: 'knownCapture', email: 'jane@example.com' });
+
+    const dispatched = logged.filter((m) => m.indexOf('dispatched to') !== -1);
+    assertThat(dispatched.length).isEqualTo(1);
+    assertThat(dispatched[0]).contains('the loaded Switch');
+- name: Known capture names the pre-load queue under sg_debug=1
+  code: |-
+    const logged = [];
+    mock('getUrl', (component) => component === 'query' ? 'sg_debug=1' : '');
+    mock('logToConsole', function (m) { logged.push(m); });
+    mock('copyFromWindow', (key) => key === '__sgQueue' ? [] : undefined);
+
+    runCode({ tagType: 'knownCapture', email: 'jane@example.com' });
+
+    const dispatched = logged.filter((m) => m.indexOf('dispatched to') !== -1);
+    assertThat(dispatched.length).isEqualTo(1);
+    assertThat(dispatched[0]).contains('the pre-load queue');
+    // A queued call is pending, not failed.
+    assertApi('gtmOnSuccess').wasCalled();
+- name: Known capture dispatch log is silent without sg_debug=1
+  code: |-
+    const logged = [];
+    mock('logToConsole', function (m) { logged.push(m); });
+    mock('copyFromWindow', (key) => key === '__sgQueue' ? [] : undefined);
+
+    runCode({ tagType: 'knownCapture', email: 'jane@example.com' });
+
+    const dispatched = logged.filter((m) => m.indexOf('dispatched to') !== -1);
+    assertThat(dispatched.length).isEqualTo(0);
 - name: Meta IDs are not generated when the checkbox is off
   code: |-
     fbclid = 'IwAR0AbC';
@@ -1267,6 +1592,15 @@ setup: |
   mock('createQueue', () => function () {});
   mock('injectScript', (url, onSuccess) => { onSuccess(); });
   mock('logToConsole', () => {});
+
+  // Record each callInWindow as [path, ...args] so known-capture scenarios can
+  // assert on exactly what reached the pixel.
+  const windowCalls = [];
+  mock('callInWindow', function () {
+    const call = [];
+    for (let i = 0; i < arguments.length; i++) call.push(arguments[i]);
+    windowCalls.push(call);
+  });
 
   // The Tests runner does NOT reset real template storage between scenarios —
   // verified: leaving it real made the first runCode set the install key, and
