@@ -21,6 +21,8 @@ versions:
     changeNotes: Let the send tag run when pixel.js is loaded outside GTM
   - sha: 0d8704cbc280b1cf12a8350a4e5a65ee94bf1320
     changeNotes: Add a Send known email and phone tag type
+  - sha: 2a5637dcc372006201d352d7415467022dbef994
+    changeNotes: Optionally generate Meta _fbp and _fbc cookies when missing
   - sha: 85d52c65e7742dcb7ae527cdeca8eb281f007df6
     changeNotes: Give each test scenario its own template storage
   - sha: 3e53ac7257208e1b9abf52f7eb8c2cd0597d8e76
