@@ -62,7 +62,7 @@ ___TEMPLATE_PARAMETERS___
     "name": "generateMetaIds",
     "checkboxText": "Generate Meta IDs when missing",
     "simpleValueType": true,
-    "help": "Creates the Meta _fbp cookie, and _fbc from an fbclid in the URL, when they are missing. Never changes existing values. Tick only on sites running the Meta pixel: elsewhere Meta has never seen the ID, so it has nothing to match. Runs on this tag's trigger; fire it on Initialization so the IDs exist before the first Boost event. Skipped when ad_storage is denied, but without Consent Mode that check always passes, so gate this tag with its consent settings.",
+    "help": "Sets Meta's browser and click ID cookies (_fbp and _fbc) if the Meta pixel hasn't yet, so Boost can send them from the first event. Existing cookies are left as they are. Use only on sites that also run the Meta pixel. Works best when this tag fires on Initialization. Nothing is set when ad_storage consent is denied.",
     "defaultValue": false
   },
   {
