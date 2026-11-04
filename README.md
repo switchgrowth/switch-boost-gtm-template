@@ -11,6 +11,15 @@ The template has two tag types:
   uses. The pixel hashes them the same way automatic mode does, so they match the same records.
   Use it when automatic mode isn't matching enough sessions back to the client's records.
 
+## Advanced Matching (Setup tags)
+
+Ticking **Advanced Matching** adds `&advanced-matching=true` to the pixel URL. The pixel then
+sends the hashed first and last name typed on the page with each Boost capture, together with the
+email (or phone) they were entered with. Boost fills a blank name onto a conversion only when that
+conversion's own email or phone is the one the name was entered with. Names are never used to
+match, and never stored in the session cookie. It needs Automatic Mode, since names are captured
+from form fields. Unticked (the default), the tag loads the pixel exactly as before.
+
 ## Setting up Send known email and phone for a client
 
 Prerequisites (one-time, not per client):
