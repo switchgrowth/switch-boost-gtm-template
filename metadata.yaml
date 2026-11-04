@@ -17,6 +17,8 @@ documentation: "https://docs.switchgrowth.com/boost"
 versions:
   # Latest version first, other notes are not used and
   # are for reference only.
+  - sha: 9fb825e3922f433c7c32cacb479d18f34535d52e
+    changeNotes: Add an Advanced Matching checkbox
   - sha: da75f7c1d80de0b296ba41f6eca5acf6f4a01caf
     changeNotes: Combine the send tag type with Meta ID generation
   - sha: a113c4631a892f90164d09f5f9e1d4eb2d852740
