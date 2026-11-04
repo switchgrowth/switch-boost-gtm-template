@@ -82,6 +82,14 @@ ___TEMPLATE_PARAMETERS___
       },
       {
         "type": "CHECKBOX",
+        "name": "advancedMatching",
+        "checkboxText": "Advanced Matching",
+        "simpleValueType": true,
+        "defaultValue": false,
+        "help": "Adds the hashed first and last name typed on the page to Boost captures, so Boost can fill a blank name on a conversion matched to the same email or phone. Requires Automatic Mode."
+      },
+      {
+        "type": "CHECKBOX",
         "name": "generateMetaIds",
         "checkboxText": "Generate Meta IDs when missing",
         "simpleValueType": true,
@@ -196,6 +204,7 @@ const excludedIds = data.excludedIds || "";
 const excludedInputTypes = data.excludedInputTypes || "";
 const excludedAttributes = data.excludedAttributes || "";
 const automaticMode = data.automaticMode;
+const advancedMatching = data.advancedMatching === true;
 const sessionLimit = data.sessionLimit;
 const cacheKey = "switch-" + pixelId;
 // templateStorage is per-template and lives for the page, which is exactly the
@@ -319,6 +328,12 @@ function embedScripts(onSuccess, onFail) {
 
   let autoQuery = automaticMode ? "&auto=true" : "&auto=false";
   options += autoQuery;
+
+  // Off unless ticked, so tags saved before this option existed load the pixel
+  // exactly as before.
+  if (advancedMatching) {
+    options += "&advanced-matching=true";
+  }
 
   // pixel.js floors the value to 500 minimum on the receiving side
   options += "&session-byte-limit=" + sessionLimit;
@@ -1068,6 +1083,38 @@ scenarios:
     assertThat(capturedUrl).contains('&skipped-input-types=checkbox');
     assertThat(capturedUrl).contains('&auto=false');
     assertThat(capturedUrl).contains('&session-byte-limit=750');
+- name: Advanced Matching adds its option to the pixel URL
+  code: |-
+    let capturedUrl = null;
+
+    mock('copyFromWindow', () => undefined);
+    mock('setInWindow', () => true);
+    mock('injectScript', (url, onSuccess) => {
+      capturedUrl = url;
+      onSuccess();
+    });
+
+    runCode({ pixelCode: "abc123", automaticMode: true, advancedMatching: true, sessionLimit: 4048 });
+
+    assertThat(capturedUrl).contains('&advanced-matching=true');
+- name: Advanced Matching is left out of the pixel URL when unticked or missing
+  code: |-
+    let urls = [];
+
+    mock('copyFromWindow', () => undefined);
+    mock('setInWindow', () => true);
+    mock('injectScript', (url, onSuccess) => {
+      urls.push(url);
+      onSuccess();
+    });
+
+    runCode({ pixelCode: "abc123", automaticMode: true, advancedMatching: false, sessionLimit: 4048 });
+    // A tag saved before the option existed has no value for it.
+    runCode({ pixelCode: "abc123", automaticMode: true, sessionLimit: 4048 });
+
+    assertThat(urls.length).isEqualTo(2);
+    assertThat(urls[0].indexOf('advanced-matching')).isEqualTo(-1);
+    assertThat(urls[1].indexOf('advanced-matching')).isEqualTo(-1);
 - name: Custom pixelUrl overrides default domain
   code: |-
     let capturedUrl = null;
