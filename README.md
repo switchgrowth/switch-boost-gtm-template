@@ -20,6 +20,20 @@ conversion's own email or phone is the one the name was entered with. Names are 
 match, and never stored in the session cookie. It needs Automatic Mode, since names are captured
 from form fields. Unticked (the default), the tag loads the pixel exactly as before.
 
+## Generate Meta IDs (Setup tags)
+
+Ticking **Generate Meta IDs when missing** adds `&generate-meta-ids=true` to the pixel URL. The
+pixel then writes Meta's `_fbp` when the Meta pixel hasn't yet, and `_fbc` on each new `fbclid`, so
+Boost captures carry them from the first event. The Meta pixel adopts the cookies it finds, so both
+send the same IDs. Use it only on sites that also run the Meta pixel.
+
+- **Consent:** the option is added only when `ad_storage` is granted as the tag first fires on the
+  page. Consent granted later on the same page takes effect on the next page load.
+- **Two Setup tags on one page:** only the first to fire loads the pixel, so its settings win for
+  this option and Advanced Matching alike.
+- **Custom Pixel URL:** the pixel.js it serves must be recent enough to know the option; older
+  copies ignore it and write nothing.
+
 ## Setting up Send known email and phone for a client
 
 Prerequisites (one-time, not per client):
