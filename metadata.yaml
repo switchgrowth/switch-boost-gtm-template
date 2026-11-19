@@ -17,6 +17,8 @@ documentation: "https://docs.switchgrowth.com/boost"
 versions:
   # Latest version first, other notes are not used and
   # are for reference only.
+  - sha: 3803f3ba6e0f48838ab3f982add44f5c47c23550
+    changeNotes: Let pixel.js write Meta's _fbp and _fbc
   - sha: 9fb825e3922f433c7c32cacb479d18f34535d52e
     changeNotes: Add an Advanced Matching checkbox
   - sha: da75f7c1d80de0b296ba41f6eca5acf6f4a01caf
