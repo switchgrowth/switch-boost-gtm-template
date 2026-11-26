@@ -13,12 +13,21 @@ The template has two tag types:
 
 ## Advanced Matching (Setup tags)
 
-Ticking **Advanced Matching** adds `&advanced-matching=true` to the pixel URL. The pixel then
-sends the hashed first and last name typed on the page with each Boost capture, together with the
-email (or phone) they were entered with. Boost fills a blank name onto a conversion only when that
-conversion's own email or phone is the one the name was entered with. Names are never used to
-match, and never stored in the session cookie. It needs Automatic Mode, since names are captured
-from form fields. Unticked (the default), the tag loads the pixel exactly as before.
+Advanced Matching is **on by default** in Automatic Mode: the tag adds `&advanced-matching=true`
+to the pixel URL. The pixel then sends the hashed first and last name typed on the page with each
+Boost capture, together with the email (or phone) they were entered with. Boost fills a blank name
+onto a conversion only when that conversion's own email or phone is the one the name was entered
+with. Names are never used to match, and never stored in the session cookie. It needs Automatic
+Mode, since names are captured from form fields, so a manual-mode tag leaves it off.
+
+- **Opting out:** ticking **Don't collect first and last name** leaves Advanced Matching off and
+  adds `first_name,last_name` to `excluded-attributes`. The pixel also reads names for Realtime
+  events that opt in to advanced matching, so the exclusion stops it reading names from the page
+  at all.
+- **Existing tags:** the opt-out replaced an opt-in checkbox. A tag saved before has no value for
+  the opt-out, so Advanced Matching comes on once someone accepts the template update and the
+  client publishes the container. Nothing changes on the site before that publish.
+- **Future fields** (postal code, address) get their own opt-out box when the pixel collects them.
 
 ## Generate Meta IDs (Setup tags)
 
