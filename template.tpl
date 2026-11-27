@@ -81,12 +81,31 @@ ___TEMPLATE_PARAMETERS___
         "defaultValue": true
       },
       {
+        "type": "LABEL",
+        "name": "advancedMatchingLabel",
+        "displayName": "\u003cstrong\u003eAdvanced Matching is on unless you tick the box below.\u003c/strong\u003e Boost also collects the first and last name typed on the page, hashed in the visitor\u0027s browser before they\u0027re sent to Switch.",
+        "enablingConditions": [
+          {
+            "paramName": "automaticMode",
+            "paramValue": true,
+            "type": "EQUALS"
+          }
+        ]
+      },
+      {
         "type": "CHECKBOX",
-        "name": "advancedMatching",
-        "checkboxText": "Advanced Matching",
+        "name": "advancedMatchingOptOutNames",
+        "checkboxText": "Don\u0027t collect first and last name",
         "simpleValueType": true,
         "defaultValue": false,
-        "help": "Adds the hashed first and last name typed on the page to Boost captures, so Boost can fill a blank name on a conversion matched to the same email or phone. Requires Automatic Mode."
+        "help": "Boost will not read first and last names.",
+        "enablingConditions": [
+          {
+            "paramName": "automaticMode",
+            "paramValue": true,
+            "type": "EQUALS"
+          }
+        ]
       },
       {
         "type": "CHECKBOX",
@@ -120,7 +139,7 @@ ___TEMPLATE_PARAMETERS___
         "displayName": "Attributes to exclude",
         "simpleValueType": true,
         "textAsList": true,
-        "help": "Specific attrubytes (like gclid, ipaddress, etc) that Boost should not collect",
+        "help": "Attributes Boost should not collect, one per line. Click IDs: gclid, gbraid, wbraid, dclid, fbclid, msclkid, ttclid, twclid, li_fat_id, epik, sccid, rdt_cid, ndclid, oppref. URL parameters: utm_source, utm_medium, utm_campaign, gad_source, gad_campaignid. Cookies: fbp, fbc, ga, rdt_uuid, gcl_aw, gcl_dc, uetmsclkid. Visit details: ipaddress, useragent, landing_page_url, landing_page_referrer. Names: first_name, last_name. Realtime: phone (stops Realtime filling in the visitor\u0027s phone; Boost still captures phones). Excluding a click ID also excludes the cookie that stores it (for example gclid covers gcl_aw and gcl_dc).",
         "lineCount": 10
       },
       {
@@ -199,7 +218,11 @@ const excludedIds = data.excludedIds || "";
 const excludedInputTypes = data.excludedInputTypes || "";
 const excludedAttributes = data.excludedAttributes || "";
 const automaticMode = data.automaticMode;
-const advancedMatching = data.advancedMatching === true;
+// On unless the client opts out. A tag saved before the opt-out box existed has no value for
+// it, so it comes out on once the template update is accepted and published. Names are only
+// collected in Automatic Mode, so a manual-mode tag doesn't report Advanced Matching as on.
+const optOutNames = data.advancedMatchingOptOutNames === true;
+const advancedMatching = automaticMode && !optOutNames;
 const generateMetaIds = data.generateMetaIds === true;
 const sessionLimit = data.sessionLimit;
 const cacheKey = "switch-" + pixelId;
@@ -314,8 +337,14 @@ function embedScripts(onSuccess, onFail) {
     options += "&skipped-input-ids=" + excludedIds.toString();
   }
 
-  if (excludedAttributes.length > 0) {
-    options += "&excluded-attributes=" + excludedAttributes.toString();
+  // The pixel reads names for Realtime events whatever Advanced Matching says, so opting out
+  // excludes them outright: "don't collect" means not reading them from the page at all.
+  let excludedList = excludedAttributes.length > 0 ? excludedAttributes.toString() : "";
+  if (optOutNames) {
+    excludedList += (excludedList.length > 0 ? "," : "") + "first_name,last_name";
+  }
+  if (excludedList.length > 0) {
+    options += "&excluded-attributes=" + excludedList;
   }
 
   if (excludedInputTypes.length > 0 ) {
@@ -325,8 +354,6 @@ function embedScripts(onSuccess, onFail) {
   let autoQuery = automaticMode ? "&auto=true" : "&auto=false";
   options += autoQuery;
 
-  // Off unless ticked, so tags saved before this option existed load the pixel
-  // exactly as before.
   if (advancedMatching) {
     options += "&advanced-matching=true";
   }
@@ -878,21 +905,7 @@ scenarios:
     assertThat(capturedUrl).contains('&skipped-input-types=checkbox');
     assertThat(capturedUrl).contains('&auto=false');
     assertThat(capturedUrl).contains('&session-byte-limit=750');
-- name: Advanced Matching adds its option to the pixel URL
-  code: |-
-    let capturedUrl = null;
-
-    mock('copyFromWindow', () => undefined);
-    mock('setInWindow', () => true);
-    mock('injectScript', (url, onSuccess) => {
-      capturedUrl = url;
-      onSuccess();
-    });
-
-    runCode({ pixelCode: "abc123", automaticMode: true, advancedMatching: true, sessionLimit: 4048 });
-
-    assertThat(capturedUrl).contains('&advanced-matching=true');
-- name: Advanced Matching is left out of the pixel URL when unticked or missing
+- name: Advanced Matching is on by default, including for tags saved before the opt-out existed
   code: |-
     let urls = [];
 
@@ -903,13 +916,60 @@ scenarios:
       onSuccess();
     });
 
-    runCode({ pixelCode: "abc123", automaticMode: true, advancedMatching: false, sessionLimit: 4048 });
-    // A tag saved before the option existed has no value for it.
+    runCode({ pixelCode: "abc123", automaticMode: true, advancedMatchingOptOutNames: false, sessionLimit: 4048 });
+    // A tag saved before the opt-out box existed has no value for it.
     runCode({ pixelCode: "abc123", automaticMode: true, sessionLimit: 4048 });
+    // A tag saved with the old opt-in box unticked: that box no longer exists, so it is ignored.
+    runCode({ pixelCode: "abc123", automaticMode: true, advancedMatching: false, sessionLimit: 4048 });
 
-    assertThat(urls.length).isEqualTo(2);
-    assertThat(urls[0].indexOf('advanced-matching')).isEqualTo(-1);
-    assertThat(urls[1].indexOf('advanced-matching')).isEqualTo(-1);
+    assertThat(urls.length).isEqualTo(3);
+    assertThat(urls[0]).contains('&advanced-matching=true');
+    assertThat(urls[1]).contains('&advanced-matching=true');
+    assertThat(urls[2]).contains('&advanced-matching=true');
+- name: Opting out of names leaves Advanced Matching out of the pixel URL
+  code: |-
+    let capturedUrl = null;
+
+    mock('copyFromWindow', () => undefined);
+    mock('setInWindow', () => true);
+    mock('injectScript', (url, onSuccess) => {
+      capturedUrl = url;
+      onSuccess();
+    });
+
+    runCode({ pixelCode: "abc123", automaticMode: true, advancedMatchingOptOutNames: true, sessionLimit: 4048 });
+
+    assertThat(capturedUrl.indexOf('advanced-matching')).isEqualTo(-1);
+    // The pixel also reads names for Realtime events, so opting out excludes them outright.
+    assertThat(capturedUrl).contains('&excluded-attributes=first_name,last_name');
+- name: Opting out of names adds to the client's own exclusions
+  code: |-
+    let capturedUrl = null;
+
+    mock('copyFromWindow', () => undefined);
+    mock('setInWindow', () => true);
+    mock('injectScript', (url, onSuccess) => {
+      capturedUrl = url;
+      onSuccess();
+    });
+
+    runCode({ pixelCode: "abc123", automaticMode: true, advancedMatchingOptOutNames: true, excludedAttributes: "gclid", sessionLimit: 4048 });
+
+    assertThat(capturedUrl).contains('&excluded-attributes=gclid,first_name,last_name');
+- name: Advanced Matching is left out of the pixel URL in manual mode
+  code: |-
+    let capturedUrl = null;
+
+    mock('copyFromWindow', () => undefined);
+    mock('setInWindow', () => true);
+    mock('injectScript', (url, onSuccess) => {
+      capturedUrl = url;
+      onSuccess();
+    });
+
+    runCode({ pixelCode: "abc123", automaticMode: false, sessionLimit: 4048 });
+
+    assertThat(capturedUrl.indexOf('advanced-matching')).isEqualTo(-1);
 - name: Generate Meta IDs adds its option to the pixel URL
   code: |-
     let capturedUrl = null;
