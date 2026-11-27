@@ -83,7 +83,14 @@ ___TEMPLATE_PARAMETERS___
       {
         "type": "LABEL",
         "name": "advancedMatchingLabel",
-        "displayName": "\u003cstrong\u003eAdvanced Matching is on.\u003c/strong\u003e In Automatic Mode, Boost also collects the first and last name typed on the page, hashed in the visitor\u0027s browser before they\u0027re sent to Switch. Tick below to opt out."
+        "displayName": "\u003cstrong\u003eAdvanced Matching is on unless you tick the box below.\u003c/strong\u003e Boost also collects the first and last name typed on the page, hashed in the visitor\u0027s browser before they\u0027re sent to Switch.",
+        "enablingConditions": [
+          {
+            "paramName": "automaticMode",
+            "paramValue": true,
+            "type": "EQUALS"
+          }
+        ]
       },
       {
         "type": "CHECKBOX",
@@ -91,7 +98,14 @@ ___TEMPLATE_PARAMETERS___
         "checkboxText": "Don\u0027t collect first and last name",
         "simpleValueType": true,
         "defaultValue": false,
-        "help": "Boost will not read first and last names."
+        "help": "Boost will not read first and last names.",
+        "enablingConditions": [
+          {
+            "paramName": "automaticMode",
+            "paramValue": true,
+            "type": "EQUALS"
+          }
+        ]
       },
       {
         "type": "CHECKBOX",
@@ -125,7 +139,7 @@ ___TEMPLATE_PARAMETERS___
         "displayName": "Attributes to exclude",
         "simpleValueType": true,
         "textAsList": true,
-        "help": "Attributes Boost should not collect, one per line. Click IDs: gclid, gbraid, wbraid, dclid, fbclid, msclkid, ttclid, twclid, li_fat_id, epik, sccid, rdt_cid, ndclid, oppref. URL parameters: utm_source, utm_medium, utm_campaign, gad_source, gad_campaignid. Cookies: fbp, fbc, ga, rdt_uuid, gcl_aw, gcl_dc, uetmsclkid. Visit details: ipaddress, useragent, landing_page_url, landing_page_referrer. Names: first_name, last_name. Excluding a click ID also excludes the cookie that stores it (for example gclid covers gcl_aw and gcl_dc).",
+        "help": "Attributes Boost should not collect, one per line. Click IDs: gclid, gbraid, wbraid, dclid, fbclid, msclkid, ttclid, twclid, li_fat_id, epik, sccid, rdt_cid, ndclid, oppref. URL parameters: utm_source, utm_medium, utm_campaign, gad_source, gad_campaignid. Cookies: fbp, fbc, ga, rdt_uuid, gcl_aw, gcl_dc, uetmsclkid. Visit details: ipaddress, useragent, landing_page_url, landing_page_referrer. Names: first_name, last_name. Realtime: phone (stops Realtime filling in the visitor\u0027s phone; Boost still captures phones). Excluding a click ID also excludes the cookie that stores it (for example gclid covers gcl_aw and gcl_dc).",
         "lineCount": 10
       },
       {
